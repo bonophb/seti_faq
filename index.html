@@ -21,7 +21,7 @@
         <!-- 헤더 -->
         <header class="text-center mb-8">
             <h1 class="text-3xl sm:text-4xl font-bold text-white mb-2">🛸 SETI 보드게임 FAQ</h1>
-            <p class="text-gray-400 text-sm sm:text-base">실시간 규칙, 에라타 및 확장 통합 검색 시스템</p>
+            <p class="text-gray-400 text-sm sm:text-base">실시간 규칙, 에라타 및 카드 번호 통합 검색 시스템</p>
         </header>
 
         <!-- 1차 구분 탭 (전체 / 본판 / 확장) -->
@@ -40,10 +40,11 @@
         <!-- 검색창 -->
         <div class="mb-6">
             <div class="relative">
-                <input type="text" id="searchInput" placeholder="질문, 답변, 키워드 검색 (예: 스캔, 기관, 카드)..." 
+                <input type="text" id="searchInput" placeholder="질문, 답변, 카드 번호(예: 15, #15, ET.1), 키워드 검색..." 
                        class="w-full bg-[#161b22] border border-[#30363d] rounded-xl px-5 py-3.5 text-white placeholder-gray-500 focus:outline-none focus:border-[#58a6ff] focus:ring-1 focus:ring-[#58a6ff] text-base">
                 <span class="absolute right-4 top-3.5 text-gray-500">🔍</span>
             </div>
+            <p class="text-xs text-gray-500 mt-2 px-1">💡 팁: 숫자만 입력해도 해당 카드 번호(#15, #120 등)를 정밀하게 자동 검색합니다.</p>
         </div>
 
         <!-- 세부 카테고리 필터 버튼 -->
@@ -67,22 +68,17 @@
         let loadTimer = null;
         let isLoaded = false;
 
-        // 캐시 파괴용 주소 파라미터 추가
         function getBustedUrl(url) {
             const separator = url.includes('?') ? '&' : '?';
             return `${url}${separator}_cb=${Date.now()}`;
         }
 
-        // 30초 타임아웃 감지
         function startTimeoutTimer() {
             clearTimeout(loadTimer);
             loadTimer = setTimeout(() => {
                 if (!isLoaded) {
-                    // 브라우저 캐시 삭제 시도
                     if ('caches' in window) {
-                        caches.keys().then(names => {
-                            names.forEach(name => caches.delete(name));
-                        });
+                        caches.keys().then(names => names.forEach(name => caches.delete(name)));
                     }
 
                     document.getElementById('faqList').innerHTML = 
@@ -95,10 +91,9 @@
                         loadCSV(GVIZ_URL, true);
                     }, 1000);
                 }
-            }, 30000); // 30초
+            }, 30000);
         }
 
-        // 수동 강력 새로고침
         function forceReload() {
             if ('caches' in window) {
                 caches.keys().then(names => names.forEach(name => caches.delete(name)));
@@ -209,17 +204,38 @@
         }
 
         function renderFAQs() {
-            const query = document.getElementById('searchInput').value.toLowerCase().trim();
+            const rawQuery = document.getElementById('searchInput').value.toLowerCase().trim();
             const listContainer = document.getElementById('faqList');
             
             const filtered = faqData.filter(item => {
                 const matchesEdition = currentEdition === '전체' || item.edition === currentEdition;
                 const matchesCategory = currentCategory === '전체' || item.category === currentCategory;
-                const matchesQuery = !query || 
-                    item.question.toLowerCase().includes(query) || 
-                    item.answer.toLowerCase().includes(query) || 
-                    item.keywords.toLowerCase().includes(query);
-                return matchesEdition && matchesCategory && matchesQuery;
+                if (!matchesEdition || !matchesCategory) return false;
+                if (!rawQuery) return true;
+
+                const q = item.question.toLowerCase();
+                const a = item.answer.toLowerCase();
+                const k = item.keywords.toLowerCase();
+
+                // 1. 일반 텍스트 검색
+                if (q.includes(rawQuery) || a.includes(rawQuery) || k.includes(rawQuery)) return true;
+
+                // 2. 카드 번호 스마트 매칭 ("15", "#15", "015" 등 입력 시 #15 카드 인식)
+                const cleanQuery = rawQuery.replace(/^#/, '');
+                if (/^\d+$/.test(cleanQuery)) {
+                    const num = parseInt(cleanQuery, 10);
+                    const numPattern = new RegExp(`#0*${num}(?=[^0-9]|$)`, 'i');
+                    if (numPattern.test(q) || numPattern.test(k)) return true;
+                }
+
+                // 3. 외계인 카드 번호 스마트 매칭 ("et1", "et.1", "et 1" 등 입력 시 #ET.1 인식)
+                if (/^et\s*\.?\s*\d+/i.test(rawQuery)) {
+                    const etNum = rawQuery.replace(/[^0-9]/g, '');
+                    const etPattern = new RegExp(`#et\\s*\\.?\\s*0*${etNum}`, 'i');
+                    if (etPattern.test(q) || etPattern.test(k)) return true;
+                }
+
+                return false;
             });
 
             if (filtered.length === 0) {
@@ -268,7 +284,6 @@
 
         document.getElementById('searchInput').addEventListener('input', renderFAQs);
         
-        // 데이터 수신 시작
         loadCSV(PUBLISHED_URL);
     </script>
 </body>
