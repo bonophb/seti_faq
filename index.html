@@ -56,50 +56,59 @@
     </div>
 
     <script>
-        // 전달해주신 구글 시트 웹 게시 주소
-        const RAW_PUBLISHED_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQYjGO3WyNoP4Pg3AJ8neCz4GYD1o9wVOjWnxvyIGpmImV3KnERKDG3Q_1_TdtQxWGwC22E8CbM6SWf/pubhtml";
-        
-        // CSV 데이터 수신용 URL로 자동 변환
-        const CSV_URL = RAW_PUBLISHED_URL.replace('/pubhtml', '/pub?output=csv');
+        const SHEET_ID = '1H8VjQ4cSiOKzghHHUsna8KWBzVYm-YB-GPgj_haSr88';
+        const PUBLISHED_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQYjGO3WyNoP4Pg3AJ8neCz4GYD1o9wVOjWnxvyIGpmImV3KnERKDG3Q_1_TdtQxWGwC22E8CbM6SWf/pub?output=csv';
+        const GVIZ_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv`;
 
         let faqData = [];
         let currentEdition = '전체';
         let currentCategory = '전체';
 
-        async function fetchFAQData() {
-            try {
-                const response = await fetch(CSV_URL);
-                if (!response.ok) throw new Error('Network response was not ok');
-                const csvText = await response.text();
-                
-                Papa.parse(csvText, {
-                    header: true,
-                    skipEmptyLines: true,
-                    complete: function(results) {
-                        faqData = results.data.map(item => {
-                            const cat = item['카테고리'] ? item['카테고리'].trim() : '기타';
-                            let ed = item['구분'] ? item['구분'].trim() : '';
-                            if (!ed) {
-                                ed = (cat.includes('확장') || cat.includes('기관') || cat.includes('프로모')) ? '확장' : '본판';
-                            }
-                            return {
-                                edition: ed,
-                                category: cat,
-                                question: item['질문'] ? item['질문'].trim() : '',
-                                answer: item['답변'] ? item['답변'].trim() : '',
-                                keywords: item['키워드'] ? item['키워드'].trim() : ''
-                            };
-                        }).filter(item => item.question !== '');
-                        
+        function loadCSV(url, isFallback = false) {
+            Papa.parse(url, {
+                download: true,
+                header: true,
+                skipEmptyLines: true,
+                complete: function(results) {
+                    const parsed = results.data.map(item => {
+                        const cat = item['카테고리'] ? item['카테고리'].trim() : '기타';
+                        let ed = item['구분'] ? item['구분'].trim() : '';
+                        if (!ed) {
+                            ed = (cat.includes('확장') || cat.includes('기관') || cat.includes('프로모')) ? '확장' : '본판';
+                        }
+                        return {
+                            edition: ed,
+                            category: cat,
+                            question: item['질문'] ? item['질문'].trim() : '',
+                            answer: item['답변'] ? item['답변'].trim() : '',
+                            keywords: item['키워드'] ? item['키워드'].trim() : ''
+                        };
+                    }).filter(item => item.question !== '');
+
+                    if (parsed.length > 0) {
+                        faqData = parsed;
                         updateTabCounts();
                         renderCategories();
                         renderFAQs();
+                    } else if (!isFallback) {
+                        loadCSV(GVIZ_URL, true);
+                    } else {
+                        showError('FAQ 데이터를 읽지 못했습니다. 구글 시트 공유 설정을 확인해주세요.');
                     }
-                });
-            } catch (error) {
-                document.getElementById('faqList').innerHTML = 
-                    '<div class="text-center py-12 text-red-400 font-medium">데이터를 불러오지 못했습니다.<br><span class="text-sm text-gray-400 mt-2 inline-block">구글 시트 공유 권한을 확인해주세요.</span></div>';
-            }
+                },
+                error: function(err) {
+                    if (!isFallback) {
+                        loadCSV(GVIZ_URL, true);
+                    } else {
+                        showError('데이터 로드에 실패했습니다. 브라우저 강력 새로고침(Ctrl+F5)을 시도해보세요.');
+                    }
+                }
+            });
+        }
+
+        function showError(msg) {
+            document.getElementById('faqList').innerHTML = 
+                `<div class="text-center py-12 text-red-400 font-medium">${msg}</div>`;
         }
 
         function updateTabCounts() {
@@ -204,4 +213,10 @@
             }
         }
 
-        document.getElementById('searchInput').addEventListener
+        document.getElementById('searchInput').addEventListener('input', renderFAQs);
+        
+        // 수신 시작
+        loadCSV(PUBLISHED_URL);
+    </script>
+</body>
+</html>
