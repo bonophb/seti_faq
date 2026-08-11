@@ -259,6 +259,13 @@
             });
         }
 
+        function toggleEnOriginal(index) {
+            const box = document.getElementById(`en-box-${index}`);
+            if (box) {
+                box.classList.toggle('hidden');
+            }
+        }
+
         function renderFAQs() {
             const rawQuery = document.getElementById('searchInput').value.toLowerCase().trim();
             const listContainer = document.getElementById('faqList');
@@ -304,10 +311,9 @@
                     : 'bg-blue-900/50 text-blue-300 border border-blue-700/50';
                 
                 const edLabel = currentLang === 'EN' ? (item.edition === '확장' ? 'Expansion' : 'Base') : item.edition;
-                
                 const isCard = item.category.includes('카드') || item.q_ko.startsWith('#');
-                
-                // 카드 FAQ 질문 제목 병기 표기 (#번호 한글명 (English Name))
+
+                // 질문 제목 설정
                 let displayQuestion = item.q_ko;
                 if (isCard && item.q_en) {
                     const cleanEn = item.q_en.replace(/^#[a-zA-Z0-9.\s]+/, '').trim();
@@ -318,15 +324,21 @@
                     displayQuestion = item.q_en;
                 }
 
-                // 답변 표기 (카드 FAQ인 경우 영문 원문 함께 표시)
+                // 답변 및 영문 원문 토글 버튼
                 let displayAnswer = item.a_ko.replace(/\n/g, '<br>');
                 if (currentLang === 'EN' && item.a_en) {
                     displayAnswer = item.a_en.replace(/\n/g, '<br>');
-                } else if (isCard && item.a_en && item.a_en !== item.a_ko) {
+                } else if (item.a_en && item.a_en !== item.a_ko) {
+                    // 모든 FAQ 항목에 '영어 원문 보기' 토글 버튼 추가
                     displayAnswer += `
-                        <div class="mt-4 p-3.5 rounded-lg bg-[#161b22] border border-[#30363d] text-xs text-gray-400 leading-relaxed">
-                            <span class="font-semibold text-gray-300 block mb-1">🇺🇸 English Original Text:</span>
-                            ${item.a_en.replace(/\n/g, '<br>')}
+                        <div class="mt-4 pt-3 border-t border-[#30363d]/60">
+                            <button onclick="toggleEnOriginal(${index})" class="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1.5 font-medium focus:outline-none transition-colors">
+                                <span>🇺🇸</span> <span>영어 원문 보기 / Toggle English Original</span>
+                            </button>
+                            <div id="en-box-${index}" class="hidden mt-3 p-4 rounded-xl bg-[#161b22] border border-[#30363d] text-xs sm:text-sm text-gray-300 leading-relaxed space-y-2">
+                                <div class="font-bold text-gray-200 border-b border-[#30363d] pb-2">${item.q_en}</div>
+                                <div>${item.a_en.replace(/\n/g, '<br>')}</div>
+                            </div>
                         </div>
                     `;
                 }
