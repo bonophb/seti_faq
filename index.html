@@ -63,9 +63,58 @@
         let faqData = [];
         let currentEdition = '전체';
         let currentCategory = '전체';
+        
+        let loadTimer = null;
+        let isLoaded = false;
+
+        // 캐시 파괴용 주소 파라미터 추가
+        function getBustedUrl(url) {
+            const separator = url.includes('?') ? '&' : '?';
+            return `${url}${separator}_cb=${Date.now()}`;
+        }
+
+        // 30초 타임아웃 감지
+        function startTimeoutTimer() {
+            clearTimeout(loadTimer);
+            loadTimer = setTimeout(() => {
+                if (!isLoaded) {
+                    // 브라우저 캐시 삭제 시도
+                    if ('caches' in window) {
+                        caches.keys().then(names => {
+                            names.forEach(name => caches.delete(name));
+                        });
+                    }
+
+                    document.getElementById('faqList').innerHTML = 
+                        `<div class="text-center py-12 text-amber-400 font-medium leading-relaxed">
+                            데이터 로드가 30초 이상 지연되어 캐시를 삭제하고 자동 재시도합니다...
+                            <br><button onclick="forceReload()" class="mt-4 px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-500 transition-colors">지금 강력 새로고침</button>
+                         </div>`;
+                    
+                    setTimeout(() => {
+                        loadCSV(GVIZ_URL, true);
+                    }, 1000);
+                }
+            }, 30000); // 30초
+        }
+
+        // 수동 강력 새로고침
+        function forceReload() {
+            if ('caches' in window) {
+                caches.keys().then(names => names.forEach(name => caches.delete(name)));
+            }
+            window.location.href = window.location.pathname + '?_t=' + Date.now();
+        }
 
         function loadCSV(url, isFallback = false) {
-            Papa.parse(url, {
+            if (!isFallback) {
+                isLoaded = false;
+                startTimeoutTimer();
+            }
+
+            const targetUrl = getBustedUrl(url);
+
+            Papa.parse(targetUrl, {
                 download: true,
                 header: true,
                 skipEmptyLines: true,
@@ -86,6 +135,8 @@
                     }).filter(item => item.question !== '');
 
                     if (parsed.length > 0) {
+                        isLoaded = true;
+                        clearTimeout(loadTimer);
                         faqData = parsed;
                         updateTabCounts();
                         renderCategories();
@@ -93,6 +144,7 @@
                     } else if (!isFallback) {
                         loadCSV(GVIZ_URL, true);
                     } else {
+                        clearTimeout(loadTimer);
                         showError('FAQ 데이터를 읽지 못했습니다. 구글 시트 공유 설정을 확인해주세요.');
                     }
                 },
@@ -100,7 +152,8 @@
                     if (!isFallback) {
                         loadCSV(GVIZ_URL, true);
                     } else {
-                        showError('데이터 로드에 실패했습니다. 브라우저 강력 새로고침(Ctrl+F5)을 시도해보세요.');
+                        clearTimeout(loadTimer);
+                        showError('데이터 로드에 실패했습니다. 아래 버튼을 눌러 강력 새로고침을 시도해보세요.<br><button onclick="forceReload()" class="mt-4 px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-500">강력 새로고침</button>');
                     }
                 }
             });
@@ -215,7 +268,7 @@
 
         document.getElementById('searchInput').addEventListener('input', renderFAQs);
         
-        // 수신 시작
+        // 데이터 수신 시작
         loadCSV(PUBLISHED_URL);
     </script>
 </body>
