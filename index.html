@@ -56,11 +56,11 @@
     </div>
 
     <script>
-        const PUBLISHED_CSV_URL = ""; 
-        const SHEET_ID = '1H8VjQ4cSiOKzghHHUsna8KWBzVYm-YB-GPgj_haSr88';
-        const FALLBACK_CSV_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv`;
-
-        const CSV_URL = PUBLISHED_CSV_URL || FALLBACK_CSV_URL;
+        // 전달해주신 구글 시트 웹 게시 주소
+        const RAW_PUBLISHED_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQYjGO3WyNoP4Pg3AJ8neCz4GYD1o9wVOjWnxvyIGpmImV3KnERKDG3Q_1_TdtQxWGwC22E8CbM6SWf/pubhtml";
+        
+        // CSV 데이터 수신용 URL로 자동 변환
+        const CSV_URL = RAW_PUBLISHED_URL.replace('/pubhtml', '/pub?output=csv');
 
         let faqData = [];
         let currentEdition = '전체';
@@ -204,8 +204,4 @@
             }
         }
 
-        document.getElementById('searchInput').addEventListener('input', renderFAQs);
-        fetchFAQData();
-    </script>
-</body>
-</html>
+        document.getElementById('searchInput').addEventListener
