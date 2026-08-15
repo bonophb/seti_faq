@@ -356,32 +356,17 @@
                 
                 const edLabel = currentLang === 'EN' ? (item.edition === '확장' ? 'Expansion' : 'Base') : item.edition;
                 const catLabel = currentLang === 'EN' ? item.cat_en : item.cat_ko;
-                const isCard = item.cat_ko.includes('카드') || item.q_ko.startsWith('#');
+                
+                // 단독 질문 제목 표기
+                const displayQuestion = currentLang === 'EN' ? (item.q_en || item.q_ko) : (item.q_ko || item.q_en);
 
-                // [수정된 질문 제목 설정 로직]
-                let displayQuestion = '';
-                if (currentLang === 'EN') {
-                    // 영문 모드일 때는 무조건 영문 질문 제목(카드명 포함)을 최우선으로 출력
-                    displayQuestion = item.q_en || item.q_ko;
-                } else {
-                    // 한국어 모드일 때
-                    displayQuestion = item.q_ko;
-                    // 카드 FAQ의 경우 한글명 뒤에 영문명을 병기 (#번호 한글명 (English Name))
-                    if (isCard && item.q_en) {
-                        const cleanEn = item.q_en.replace(/^#[a-zA-Z0-9.\s]+/, '').trim();
-                        if (cleanEn && !item.q_ko.toLowerCase().includes(cleanEn.toLowerCase())) {
-                            displayQuestion = `${item.q_ko} (${cleanEn})`;
-                        }
-                    }
-                }
-
-                // [수정된 답변 내용 구성 로직]
+                // 답변 구성
                 let displayAnswer = '';
                 if (currentLang === 'EN') {
-                    // 영문 모드일 때는 영문 답변만 단독 출력
+                    // 영문 모드일 때는 영문 답변 단독 출력
                     displayAnswer = (item.a_en || item.a_ko).replace(/\n/g, '<br>');
                 } else {
-                    // 한국어 모드일 때: 한국어 답변 + 영어 원문 보기 토글 버튼 제공
+                    // 한국어 모드일 때: 한국어 답변 + 영어 원문 보기 버튼 제공
                     displayAnswer = item.a_ko.replace(/\n/g, '<br>');
                     if (item.a_en && item.a_en !== item.a_ko) {
                         displayAnswer += `
