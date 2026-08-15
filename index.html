@@ -83,4 +83,303 @@
                 all: "전체",
                 base: "본판",
                 exp: "확장",
-                placeholder: "질문, 답변, 카드
+                placeholder: "질문, 답변, 카드 번호(예: 15, #15, ET.1), 키워드 검색...",
+                tip: "💡 팁: 숫자만 입력해도 해당 카드 번호(#15, #120 등)를 정밀하게 자동 검색합니다.",
+                noResult: "검색 조건에 맞는 FAQ가 없습니다.",
+                loading: "FAQ 데이터를 불러오는 중입니다...",
+                delayMsg: "데이터 로드가 지연되어 캐시를 삭제하고 자동 재시도합니다...",
+                reloadBtn: "지금 강력 새로고침"
+            },
+            EN: {
+                title: "🛸 SETI Board Game FAQ",
+                sub: "Real-time Rules, Errata & Card Search System",
+                all: "All",
+                base: "Base Game",
+                exp: "Expansion",
+                placeholder: "Search questions, answers, card # (e.g. 15, #15, ET.1), keywords...",
+                tip: "💡 Tip: Type a pure number to automatically search for matching card #s (#15, #120, etc.).",
+                noResult: "No FAQs match your search criteria.",
+                loading: "Loading FAQ data...",
+                delayMsg: "Loading delayed over 30s. Clearing cache and auto-retrying...",
+                reloadBtn: "Force Reload Now"
+            }
+        };
+
+        function setLanguage(lang) {
+            currentLang = lang;
+            document.querySelectorAll('.lang-btn').forEach(btn => btn.classList.remove('active'));
+            document.getElementById(`lang-${lang}`).classList.add('active');
+
+            const t = i18n[lang];
+            document.getElementById('header-title').textContent = t.title;
+            document.getElementById('header-sub').textContent = t.sub;
+            document.getElementById('searchInput').placeholder = t.placeholder;
+            document.getElementById('search-tip').textContent = t.tip;
+
+            updateTabCounts();
+            renderCategories();
+            renderFAQs();
+        }
+
+        function getBustedUrl(url) {
+            const separator = url.includes('?') ? '&' : '?';
+            return `${url}${separator}_cb=${Date.now()}`;
+        }
+
+        function startTimeoutTimer() {
+            clearTimeout(loadTimer);
+            loadTimer = setTimeout(() => {
+                if (!isLoaded) {
+                    if ('caches' in window) {
+                        caches.keys().then(names => names.forEach(name => caches.delete(name)));
+                    }
+                    const t = i18n[currentLang];
+                    document.getElementById('faqList').innerHTML = 
+                        `<div class="text-center py-12 text-amber-400 font-medium leading-relaxed">
+                            ${t.delayMsg}
+                            <br><button onclick="forceReload()" class="mt-4 px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-500 transition-colors">${t.reloadBtn}</button>
+                         </div>`;
+                    setTimeout(() => loadCSV(GVIZ_URL, true), 1000);
+                }
+            }, 30000);
+        }
+
+        function forceReload() {
+            if ('caches' in window) {
+                caches.keys().then(names => names.forEach(name => caches.delete(name)));
+            }
+            window.location.href = window.location.pathname + '?_t=' + Date.now();
+        }
+
+        function loadCSV(url, isFallback = false) {
+            if (!isFallback) {
+                isLoaded = false;
+                startTimeoutTimer();
+            }
+
+            Papa.parse(getBustedUrl(url), {
+                download: true,
+                header: true,
+                skipEmptyLines: true,
+                complete: function(results) {
+                    const parsed = results.data.map(item => {
+                        const cat = item['카테고리'] ? item['카테고리'].trim() : '기타';
+                        let ed = item['구분'] ? item['구분'].trim() : '';
+                        if (!ed) {
+                            ed = (cat.includes('확장') || cat.includes('기관') || cat.includes('프로모')) ? '확장' : '본판';
+                        }
+                        
+                        const q_ko = item['질문 (KO)'] ? item['질문 (KO)'].trim() : (item['질문'] ? item['질문'].trim() : '');
+                        const a_ko = item['답변 (KO)'] ? item['답변 (KO)'].trim() : (item['답변'] ? item['답변'].trim() : '');
+                        const q_en = item['질문 (EN)'] ? item['질문 (EN)'].trim() : q_ko;
+                        const a_en = item['답변 (EN)'] ? item['답변 (EN)'].trim() : a_ko;
+
+                        return {
+                            edition: ed,
+                            category: cat,
+                            q_ko: q_ko,
+                            a_ko: a_ko,
+                            q_en: q_en,
+                            a_en: a_en,
+                            keywords: item['키워드'] ? item['키워드'].trim() : ''
+                        };
+                    }).filter(item => item.q_ko !== '' || item.q_en !== '');
+
+                    if (parsed.length > 0) {
+                        isLoaded = true;
+                        clearTimeout(loadTimer);
+                        faqData = parsed;
+                        updateTabCounts();
+                        renderCategories();
+                        renderFAQs();
+                    } else if (!isFallback) {
+                        loadCSV(GVIZ_URL, true);
+                    } else {
+                        clearTimeout(loadTimer);
+                        showError('FAQ 데이터를 읽지 못했습니다. 구글 시트 공유 설정을 확인해주세요.');
+                    }
+                },
+                error: function(err) {
+                    if (!isFallback) {
+                        loadCSV(GVIZ_URL, true);
+                    } else {
+                        clearTimeout(loadTimer);
+                        showError('데이터 로드에 실패했습니다. 아래 버튼을 눌러 강력 새로고침을 시도해보세요.<br><button onclick="forceReload()" class="mt-4 px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-500">강력 새로고침</button>');
+                    }
+                }
+            });
+        }
+
+        function showError(msg) {
+            document.getElementById('faqList').innerHTML = `<div class="text-center py-12 text-red-400 font-medium">${msg}</div>`;
+        }
+
+        function updateTabCounts() {
+            const t = i18n[currentLang];
+            const baseCount = faqData.filter(d => d.edition === '본판').length;
+            const expCount = faqData.filter(d => d.edition === '확장').length;
+            
+            document.getElementById('label-all').textContent = `${t.all} (${faqData.length})`;
+            document.getElementById('label-base').textContent = `${t.base} (${baseCount})`;
+            document.getElementById('label-exp').textContent = `${t.exp} (${expCount})`;
+        }
+
+        function setEdition(edition) {
+            currentEdition = edition;
+            currentCategory = '전체';
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.getElementById(`tab-${edition}`).classList.add('active');
+            renderCategories();
+            renderFAQs();
+        }
+
+        function renderCategories() {
+            let availableData = faqData;
+            if (currentEdition !== '전체') {
+                availableData = faqData.filter(item => item.edition === currentEdition);
+            }
+
+            const categories = ['전체', ...new Set(availableData.map(item => item.category))];
+            const container = document.getElementById('categoryContainer');
+            container.innerHTML = '';
+
+            const tAll = i18n[currentLang].all;
+
+            categories.forEach(cat => {
+                const btn = document.createElement('button');
+                btn.className = `category-btn px-4 py-2 rounded-full text-sm font-medium transition-colors ${cat === currentCategory ? 'active' : ''}`;
+                btn.textContent = cat === '전체' ? tAll : cat;
+                btn.onclick = () => {
+                    currentCategory = cat;
+                    document.querySelectorAll('.category-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    renderFAQs();
+                };
+                container.appendChild(btn);
+            });
+        }
+
+        function toggleEnOriginal(index) {
+            const box = document.getElementById(`en-box-${index}`);
+            if (box) {
+                box.classList.toggle('hidden');
+            }
+        }
+
+        function renderFAQs() {
+            const rawQuery = document.getElementById('searchInput').value.toLowerCase().trim();
+            const listContainer = document.getElementById('faqList');
+            
+            const filtered = faqData.filter(item => {
+                const matchesEdition = currentEdition === '전체' || item.edition === currentEdition;
+                const matchesCategory = currentCategory === '전체' || item.category === currentCategory;
+                if (!matchesEdition || !matchesCategory) return false;
+                if (!rawQuery) return true;
+
+                const qKo = item.q_ko.toLowerCase();
+                const aKo = item.a_ko.toLowerCase();
+                const qEn = item.q_en.toLowerCase();
+                const aEn = item.a_en.toLowerCase();
+                const k = item.keywords.toLowerCase();
+
+                if (qKo.includes(rawQuery) || aKo.includes(rawQuery) || qEn.includes(rawQuery) || aEn.includes(rawQuery) || k.includes(rawQuery)) return true;
+
+                const cleanQuery = rawQuery.replace(/^#/, '');
+                if (/^\d+$/.test(cleanQuery)) {
+                    const num = parseInt(cleanQuery, 10);
+                    const numPattern = new RegExp(`#0*${num}(?=[^0-9]|$)`, 'i');
+                    if (numPattern.test(qKo) || numPattern.test(qEn) || numPattern.test(k)) return true;
+                }
+
+                if (/^et\s*\.?\s*\d+/i.test(rawQuery)) {
+                    const etNum = rawQuery.replace(/[^0-9]/g, '');
+                    const etPattern = new RegExp(`#et\\s*\\.?\\s*0*${etNum}`, 'i');
+                    if (etPattern.test(qKo) || etPattern.test(qEn) || etPattern.test(k)) return true;
+                }
+
+                return false;
+            });
+
+            if (filtered.length === 0) {
+                listContainer.innerHTML = `<div class="text-center py-12 text-gray-500">${i18n[currentLang].noResult}</div>`;
+                return;
+            }
+
+            listContainer.innerHTML = filtered.map((item, index) => {
+                const badgeColor = item.edition === '확장' 
+                    ? 'bg-purple-900/50 text-purple-300 border border-purple-700/50' 
+                    : 'bg-blue-900/50 text-blue-300 border border-blue-700/50';
+                
+                const edLabel = currentLang === 'EN' ? (item.edition === '확장' ? 'Expansion' : 'Base') : item.edition;
+                const isCard = item.category.includes('카드') || item.q_ko.startsWith('#');
+
+                // 질문 제목 설정
+                let displayQuestion = item.q_ko;
+                if (isCard && item.q_en) {
+                    const cleanEn = item.q_en.replace(/^#[a-zA-Z0-9.\s]+/, '').trim();
+                    if (cleanEn && !item.q_ko.toLowerCase().includes(cleanEn.toLowerCase())) {
+                        displayQuestion = `${item.q_ko} (${cleanEn})`;
+                    }
+                } else if (currentLang === 'EN' && item.q_en) {
+                    displayQuestion = item.q_en;
+                }
+
+                // 답변 및 영어 원문 보기 버튼 구성
+                let displayAnswer = item.a_ko.replace(/\n/g, '<br>');
+                if (currentLang === 'EN' && item.a_en) {
+                    displayAnswer = item.a_en.replace(/\n/g, '<br>');
+                } else if (item.a_en && item.a_en !== item.a_ko) {
+                    // 한국어로 볼 때 명확한 '버튼' 형태로 표시
+                    displayAnswer += `
+                        <div class="mt-4 pt-3 border-t border-[#30363d]/60">
+                            <button onclick="toggleEnOriginal(${index})" class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-[#21262d] hover:bg-[#30363d] border border-[#30363d] hover:border-[#58a6ff] text-xs font-medium text-gray-200 hover:text-white transition-all shadow-sm focus:outline-none cursor-pointer">
+                                <span>🇺🇸</span>
+                                <span>영어 원문 보기</span>
+                            </button>
+                            <div id="en-box-${index}" class="hidden mt-3 p-4 rounded-xl bg-[#161b22] border border-[#30363d] text-xs sm:text-sm text-gray-300 leading-relaxed space-y-2">
+                                <div class="font-bold text-gray-200 border-b border-[#30363d] pb-2">${item.q_en}</div>
+                                <div>${item.a_en.replace(/\n/g, '<br>')}</div>
+                            </div>
+                        </div>
+                    `;
+                }
+
+                return `
+                <div class="faq-item rounded-xl overflow-hidden">
+                    <button onclick="toggleFAQ(${index})" class="w-full text-left p-5 flex justify-between items-center focus:outline-none">
+                        <div>
+                            <div class="flex gap-2 items-center mb-2">
+                                <span class="text-xs px-2 py-0.5 rounded-md font-semibold ${badgeColor}">${edLabel}</span>
+                                <span class="text-xs px-2.5 py-0.5 rounded-md bg-gray-800 text-gray-300 font-medium">${item.category}</span>
+                            </div>
+                            <h3 class="text-lg font-semibold text-white">${displayQuestion}</h3>
+                        </div>
+                        <span id="icon-${index}" class="text-gray-400 text-xl ml-4 font-bold">+</span>
+                    </button>
+                    <div id="answer-${index}" class="hidden px-5 pb-5 pt-1 text-gray-300 border-t border-[#21262d] text-base leading-relaxed bg-[#0d1117]/40">
+                        ${displayAnswer}
+                        ${item.keywords ? `<div class="mt-3 text-xs text-gray-500">Tag: ${item.keywords}</div>` : ''}
+                    </div>
+                </div>
+                `;
+            }).join('');
+        }
+
+        function toggleFAQ(index) {
+            const answer = document.getElementById(`answer-${index}`);
+            const icon = document.getElementById(`icon-${index}`);
+            
+            if (answer.classList.contains('hidden')) {
+                answer.classList.remove('hidden');
+                icon.textContent = '−';
+            } else {
+                answer.classList.add('hidden');
+                icon.textContent = '+';
+            }
+        }
+
+        document.getElementById('searchInput').addEventListener('input', renderFAQs);
+        loadCSV(PUBLISHED_URL);
+    </script>
+</body>
+</html>
