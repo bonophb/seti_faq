@@ -18,8 +18,13 @@
 </head>
 <body class="min-h-screen py-10 px-4 sm:px-6 lg:px-8">
     <div class="max-w-4xl mx-auto">
-        <!-- 상단 언어 선택 -->
-        <div class="flex justify-end mb-4">
+        <!-- 상단 네비게이션: 캐시 새로고침 버튼 (좌측) & 언어 선택 (우측) -->
+        <div class="flex justify-between items-center mb-6">
+            <button onclick="forceReload()" class="px-3.5 py-1.5 rounded-xl bg-[#161b22] hover:bg-[#21262d] border border-[#30363d] hover:border-[#58a6ff] text-xs sm:text-sm font-medium text-gray-300 hover:text-white transition-all inline-flex items-center gap-1.5 shadow-sm cursor-pointer">
+                <span class="text-sm">🔄</span>
+                <span id="reload-btn-text">캐시 새로고침</span>
+            </button>
+
             <div class="inline-flex rounded-xl p-1 bg-[#161b22] border border-[#30363d] gap-1">
                 <button onclick="setLanguage('KO')" id="lang-KO" class="lang-btn px-3 py-1.5 rounded-lg text-xs sm:text-sm transition-all">🇰🇷 한국어</button>
                 <button onclick="setLanguage('EN')" id="lang-EN" class="lang-btn px-3 py-1.5 rounded-lg text-xs sm:text-sm transition-all">🇺🇸 English</button>
@@ -47,7 +52,7 @@
         <!-- 검색창 -->
         <div class="mb-6">
             <div class="relative">
-                <input type="text" id="searchInput" placeholder="질문, 답변, 카드 번호(예: 15, #15, ET.1), 키워드 검색..." 
+                <input type="text" id="searchInput" placeholder="질문 제목, 답변 내용, 카드 번호(예: 15, #15, ET.1) 검색..." 
                        class="w-full bg-[#161b22] border border-[#30363d] rounded-xl px-5 py-3.5 text-white placeholder-gray-500 focus:outline-none focus:border-[#58a6ff] focus:ring-1 focus:ring-[#58a6ff] text-base">
                 <span class="absolute right-4 top-3.5 text-gray-500">🔍</span>
             </div>
@@ -89,7 +94,6 @@
             '프로모 카드': 'Promo Cards'
         };
 
-        // 브라우저 기본 언어 감지
         function detectInitialLanguage() {
             const userLang = (navigator.language || navigator.userLanguage || '').toLowerCase();
             return userLang.startsWith('ko') ? 'KO' : 'EN';
@@ -110,8 +114,9 @@
                 all: "전체",
                 base: "본판",
                 exp: "확장",
-                placeholder: "질문, 답변, 카드 번호(예: 15, #15, ET.1), 키워드 검색...",
+                placeholder: "질문 제목, 답변 내용, 카드 번호(예: 15, #15, ET.1) 검색...",
                 tip: "💡 팁: 숫자만 입력해도 해당 카드 번호(#15, #120 등)를 정밀하게 자동 검색합니다.",
+                reloadText: "캐시 새로고침",
                 noResult: "검색 조건에 맞는 FAQ가 없습니다.",
                 loading: "FAQ 데이터를 불러오는 중입니다...",
                 delayMsg: "데이터 로드가 지연되어 캐시를 삭제하고 자동 재시도합니다...",
@@ -123,8 +128,9 @@
                 all: "All",
                 base: "Base Game",
                 exp: "Expansion",
-                placeholder: "Search questions, answers, card # (e.g. 15, #15, ET.1), keywords...",
+                placeholder: "Search questions, answers, card # (e.g. 15, #15, ET.1)...",
                 tip: "💡 Tip: Type a pure number to automatically search for matching card #s (#15, #120, etc.).",
+                reloadText: "Clear Cache & Reload",
                 noResult: "No FAQs match your search criteria.",
                 loading: "Loading FAQ data...",
                 delayMsg: "Loading delayed over 30s. Clearing cache and auto-retrying...",
@@ -143,6 +149,7 @@
             document.getElementById('header-sub').textContent = t.sub;
             document.getElementById('searchInput').placeholder = t.placeholder;
             document.getElementById('search-tip').textContent = t.tip;
+            document.getElementById('reload-btn-text').textContent = t.reloadText;
 
             updateTabCounts();
             renderCategories();
@@ -211,8 +218,7 @@
                             q_ko: q_ko,
                             a_ko: a_ko,
                             q_en: q_en,
-                            a_en: a_en,
-                            keywords: item['키워드'] ? item['키워드'].trim() : ''
+                            a_en: a_en
                         };
                     }).filter(item => item.q_ko !== '' || item.q_en !== '');
 
@@ -316,23 +322,23 @@
                 const aKo = item.a_ko.toLowerCase();
                 const qEn = item.q_en.toLowerCase();
                 const aEn = item.a_en.toLowerCase();
-                const k = item.keywords.toLowerCase();
-                const cKo = item.cat_ko.toLowerCase();
-                const cEn = item.cat_en.toLowerCase();
 
-                if (qKo.includes(rawQuery) || aKo.includes(rawQuery) || qEn.includes(rawQuery) || aEn.includes(rawQuery) || k.includes(rawQuery) || cKo.includes(rawQuery) || cEn.includes(rawQuery)) return true;
+                // 1. 질문 제목과 답변 내용 기준 검색
+                if (qKo.includes(rawQuery) || aKo.includes(rawQuery) || qEn.includes(rawQuery) || aEn.includes(rawQuery)) return true;
 
+                // 2. 카드 번호 스마트 매칭 (질문 제목 기준)
                 const cleanQuery = rawQuery.replace(/^#/, '');
                 if (/^\d+$/.test(cleanQuery)) {
                     const num = parseInt(cleanQuery, 10);
                     const numPattern = new RegExp(`#0*${num}(?=[^0-9]|$)`, 'i');
-                    if (numPattern.test(qKo) || numPattern.test(qEn) || numPattern.test(k)) return true;
+                    if (numPattern.test(qKo) || numPattern.test(qEn)) return true;
                 }
 
+                // 3. 외계종 카드 번호 스마트 매칭
                 if (/^et\s*\.?\s*\d+/i.test(rawQuery)) {
                     const etNum = rawQuery.replace(/[^0-9]/g, '');
                     const etPattern = new RegExp(`#et\\s*\\.?\\s*0*${etNum}`, 'i');
-                    if (etPattern.test(qKo) || etPattern.test(qEn) || etPattern.test(k)) return true;
+                    if (etPattern.test(qKo) || etPattern.test(qEn)) return true;
                 }
 
                 return false;
@@ -368,7 +374,6 @@
                 if (currentLang === 'EN' && item.a_en) {
                     displayAnswer = item.a_en.replace(/\n/g, '<br>');
                 } else if (item.a_en && item.a_en !== item.a_ko) {
-                    // 한국어 모드일 때만 영어 원문 보기 버튼 표시
                     displayAnswer += `
                         <div class="mt-4 pt-3 border-t border-[#30363d]/60">
                             <button onclick="toggleEnOriginal(${index})" class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-[#21262d] hover:bg-[#30363d] border border-[#30363d] hover:border-[#58a6ff] text-xs font-medium text-gray-200 hover:text-white transition-all shadow-sm focus:outline-none cursor-pointer">
@@ -397,7 +402,6 @@
                     </button>
                     <div id="answer-${index}" class="hidden px-5 pb-5 pt-1 text-gray-300 border-t border-[#21262d] text-base leading-relaxed bg-[#0d1117]/40">
                         ${displayAnswer}
-                        ${item.keywords ? `<div class="mt-3 text-xs text-gray-500">Tag: ${item.keywords}</div>` : ''}
                     </div>
                 </div>
                 `;
