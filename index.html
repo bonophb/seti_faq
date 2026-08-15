@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SETI 보드게임 FAQ</title>
+    <title>SETI 보드게임 FAQ / SETI Board Game FAQ</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <style>
@@ -21,7 +21,7 @@
         <!-- 상단 언어 선택 -->
         <div class="flex justify-end mb-4">
             <div class="inline-flex rounded-xl p-1 bg-[#161b22] border border-[#30363d] gap-1">
-                <button onclick="setLanguage('KO')" id="lang-KO" class="lang-btn active px-3 py-1.5 rounded-lg text-xs sm:text-sm transition-all">🇰🇷 한국어</button>
+                <button onclick="setLanguage('KO')" id="lang-KO" class="lang-btn px-3 py-1.5 rounded-lg text-xs sm:text-sm transition-all">🇰🇷 한국어</button>
                 <button onclick="setLanguage('EN')" id="lang-EN" class="lang-btn px-3 py-1.5 rounded-lg text-xs sm:text-sm transition-all">🇺🇸 English</button>
             </div>
         </div>
@@ -68,8 +68,34 @@
         const PUBLISHED_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQYjGO3WyNoP4Pg3AJ8neCz4GYD1o9wVOjWnxvyIGpmImV3KnERKDG3Q_1_TdtQxWGwC22E8CbM6SWf/pub?output=csv';
         const GVIZ_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv`;
 
+        // 카테고리 기본 매핑 사전 (시트 데이터 보완용)
+        const categoryMap = {
+            '행동': 'Actions',
+            '착륙': 'Land',
+            '스캔': 'Scan',
+            '데이터 분석': 'Analyze Data',
+            '탐사선/궤도선/착륙선': 'Probes / Orbiters / Landers',
+            '기술': 'Techs',
+            '미션': 'Missions',
+            '마일스톤': 'Milestones',
+            '점수 타일': 'Gold Scoring Tiles',
+            '외계종': 'Alien Species',
+            '솔로모드': 'Solo Game',
+            '카드': 'Cards',
+            '외계종 카드': 'Alien Cards',
+            '기관': 'Organizations',
+            '확장 세팅': 'Expansion Settings',
+            '프로모 카드': 'Promo Cards'
+        };
+
+        // 브라우저 기본 언어 감지
+        function detectInitialLanguage() {
+            const userLang = (navigator.language || navigator.userLanguage || '').toLowerCase();
+            return userLang.startsWith('ko') ? 'KO' : 'EN';
+        }
+
         let faqData = [];
-        let currentLang = 'KO';
+        let currentLang = detectInitialLanguage();
         let currentEdition = '전체';
         let currentCategory = '전체';
         
@@ -108,7 +134,8 @@
         function setLanguage(lang) {
             currentLang = lang;
             document.querySelectorAll('.lang-btn').forEach(btn => btn.classList.remove('active'));
-            document.getElementById(`lang-${lang}`).classList.add('active');
+            const activeBtn = document.getElementById(`lang-${lang}`);
+            if (activeBtn) activeBtn.classList.add('active');
 
             const t = i18n[lang];
             document.getElementById('header-title').textContent = t.title;
@@ -163,10 +190,12 @@
                 skipEmptyLines: true,
                 complete: function(results) {
                     const parsed = results.data.map(item => {
-                        const cat = item['카테고리'] ? item['카테고리'].trim() : '기타';
+                        const cat_ko = item['카테고리 (KO)'] ? item['카테고리 (KO)'].trim() : (item['카테고리'] ? item['카테고리'].trim() : '기타');
+                        const cat_en = item['카테고리 (EN)'] ? item['카테고리 (EN)'].trim() : (categoryMap[cat_ko] || cat_ko);
+                        
                         let ed = item['구분'] ? item['구분'].trim() : '';
                         if (!ed) {
-                            ed = (cat.includes('확장') || cat.includes('기관') || cat.includes('프로모')) ? '확장' : '본판';
+                            ed = (cat_ko.includes('확장') || cat_ko.includes('기관') || cat_ko.includes('프로모')) ? '확장' : '본판';
                         }
                         
                         const q_ko = item['질문 (KO)'] ? item['질문 (KO)'].trim() : (item['질문'] ? item['질문'].trim() : '');
@@ -176,7 +205,8 @@
 
                         return {
                             edition: ed,
-                            category: cat,
+                            cat_ko: cat_ko,
+                            cat_en: cat_en,
                             q_ko: q_ko,
                             a_ko: a_ko,
                             q_en: q_en,
@@ -189,9 +219,8 @@
                         isLoaded = true;
                         clearTimeout(loadTimer);
                         faqData = parsed;
-                        updateTabCounts();
-                        renderCategories();
-                        renderFAQs();
+                        
+                        setLanguage(currentLang);
                     } else if (!isFallback) {
                         loadCSV(GVIZ_URL, true);
                     } else {
@@ -239,7 +268,8 @@
                 availableData = faqData.filter(item => item.edition === currentEdition);
             }
 
-            const categories = ['전체', ...new Set(availableData.map(item => item.category))];
+            const isKO = currentLang === 'KO';
+            const categories = ['전체', ...new Set(availableData.map(item => isKO ? item.cat_ko : item.cat_en))];
             const container = document.getElementById('categoryContainer');
             container.innerHTML = '';
 
@@ -272,7 +302,12 @@
             
             const filtered = faqData.filter(item => {
                 const matchesEdition = currentEdition === '전체' || item.edition === currentEdition;
-                const matchesCategory = currentCategory === '전체' || item.category === currentCategory;
+                
+                let matchesCategory = currentCategory === '전체';
+                if (!matchesCategory) {
+                    matchesCategory = (item.cat_ko === currentCategory || item.cat_en === currentCategory);
+                }
+
                 if (!matchesEdition || !matchesCategory) return false;
                 if (!rawQuery) return true;
 
@@ -281,8 +316,10 @@
                 const qEn = item.q_en.toLowerCase();
                 const aEn = item.a_en.toLowerCase();
                 const k = item.keywords.toLowerCase();
+                const cKo = item.cat_ko.toLowerCase();
+                const cEn = item.cat_en.toLowerCase();
 
-                if (qKo.includes(rawQuery) || aKo.includes(rawQuery) || qEn.includes(rawQuery) || aEn.includes(rawQuery) || k.includes(rawQuery)) return true;
+                if (qKo.includes(rawQuery) || aKo.includes(rawQuery) || qEn.includes(rawQuery) || aEn.includes(rawQuery) || k.includes(rawQuery) || cKo.includes(rawQuery) || cEn.includes(rawQuery)) return true;
 
                 const cleanQuery = rawQuery.replace(/^#/, '');
                 if (/^\d+$/.test(cleanQuery)) {
@@ -311,7 +348,8 @@
                     : 'bg-blue-900/50 text-blue-300 border border-blue-700/50';
                 
                 const edLabel = currentLang === 'EN' ? (item.edition === '확장' ? 'Expansion' : 'Base') : item.edition;
-                const isCard = item.category.includes('카드') || item.q_ko.startsWith('#');
+                const catLabel = currentLang === 'EN' ? item.cat_en : item.cat_ko;
+                const isCard = item.cat_ko.includes('카드') || item.q_ko.startsWith('#');
 
                 // 질문 제목 설정
                 let displayQuestion = item.q_ko;
@@ -324,12 +362,12 @@
                     displayQuestion = item.q_en;
                 }
 
-                // 답변 및 영어 원문 보기 버튼 구성
+                // 답변 구성
                 let displayAnswer = item.a_ko.replace(/\n/g, '<br>');
                 if (currentLang === 'EN' && item.a_en) {
                     displayAnswer = item.a_en.replace(/\n/g, '<br>');
                 } else if (item.a_en && item.a_en !== item.a_ko) {
-                    // 한국어로 볼 때 명확한 '버튼' 형태로 표시
+                    // 한국어 모드일 때만 영어 원문 보기 버튼 표시
                     displayAnswer += `
                         <div class="mt-4 pt-3 border-t border-[#30363d]/60">
                             <button onclick="toggleEnOriginal(${index})" class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-[#21262d] hover:bg-[#30363d] border border-[#30363d] hover:border-[#58a6ff] text-xs font-medium text-gray-200 hover:text-white transition-all shadow-sm focus:outline-none cursor-pointer">
@@ -350,7 +388,7 @@
                         <div>
                             <div class="flex gap-2 items-center mb-2">
                                 <span class="text-xs px-2 py-0.5 rounded-md font-semibold ${badgeColor}">${edLabel}</span>
-                                <span class="text-xs px-2.5 py-0.5 rounded-md bg-gray-800 text-gray-300 font-medium">${item.category}</span>
+                                <span class="text-xs px-2.5 py-0.5 rounded-md bg-gray-800 text-gray-300 font-medium">${catLabel}</span>
                             </div>
                             <h3 class="text-lg font-semibold text-white">${displayQuestion}</h3>
                         </div>
