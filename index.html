@@ -4,6 +4,16 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SETI 보드게임 FAQ / SETI Board Game FAQ</title>
+    
+    <!-- PWA 메타 태그 및 매니페스트 등록 -->
+    <link rel="manifest" href="./manifest.json">
+    <meta name="theme-color" content="#0d1117">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="SETI FAQ">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛸</text></svg>">
+    <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛸</text></svg>">
+
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <style>
@@ -69,11 +79,19 @@
     </div>
 
     <script>
+        // PWA 서비스 워커 등록
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                    .then(reg => console.log('Service Worker Registered'))
+                    .catch(err => console.log('Service Worker Failed', err));
+            });
+        }
+
         const SHEET_ID = '1H8VjQ4cSiOKzghHHUsna8KWBzVYm-YB-GPgj_haSr88';
         const PUBLISHED_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQYjGO3WyNoP4Pg3AJ8neCz4GYD1o9wVOjWnxvyIGpmImV3KnERKDG3Q_1_TdtQxWGwC22E8CbM6SWf/pub?output=csv';
         const GVIZ_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv`;
 
-        // 카테고리 기본 매핑 사전 (시트 데이터 보완용)
         const categoryMap = {
             '행동': 'Actions',
             '착륙': 'Land',
@@ -82,16 +100,15 @@
             '탐사선/궤도선/착륙선': 'Probes / Orbiters / Landers',
             '기술': 'Techs',
             '미션': 'Missions',
-            '데이터': 'Data',
             '마일스톤': 'Milestones',
             '점수 타일': 'Gold Scoring Tiles',
             '외계종': 'Alien Species',
-            '솔로모드': 'Solo Game',
+            '솔로 모드': 'Solo Game',
             '카드': 'Cards',
             '외계종 카드': 'Alien Cards',
-            '기업': 'Organizations',
-            '확장 세팅': 'Expansion Settings',
-            '프로모 카드': 'Promo Cards'
+            '기관': 'Organizations',
+            '확장 규칙': 'Expansion Rules',
+            '프로모': 'Promo'
         };
 
         function detectInitialLanguage() {
@@ -357,16 +374,13 @@
                 const edLabel = currentLang === 'EN' ? (item.edition === '확장' ? 'Expansion' : 'Base') : item.edition;
                 const catLabel = currentLang === 'EN' ? item.cat_en : item.cat_ko;
                 
-                // 단독 질문 제목 표기
                 const displayQuestion = currentLang === 'EN' ? (item.q_en || item.q_ko) : (item.q_ko || item.q_en);
 
                 // 답변 구성
                 let displayAnswer = '';
                 if (currentLang === 'EN') {
-                    // 영문 모드일 때는 영문 답변 단독 출력
                     displayAnswer = (item.a_en || item.a_ko).replace(/\n/g, '<br>');
                 } else {
-                    // 한국어 모드일 때: 한국어 답변 + 영어 원문 보기 버튼 제공
                     displayAnswer = item.a_ko.replace(/\n/g, '<br>');
                     if (item.a_en && item.a_en !== item.a_ko) {
                         displayAnswer += `
