@@ -45,8 +45,41 @@
             <h1 id="header-title" class="text-3xl sm:text-4xl font-bold text-white mb-2">🛸 SETI 보드게임 FAQ</h1>
             <p id="header-sub" class="text-gray-400 text-sm sm:text-base mb-4">규칙, 에라타 및 카드 검색 시스템</p>
             
-            <!-- BGG 공식 FAQ 원본 바로가기 링크 버튼 -->
-            <div class="flex flex-wrap justify-center gap-2.5 text-xs">
+            <!-- 공식 룰북 드롭다운 & BGG 링크 영역 -->
+            <div class="flex flex-wrap justify-center items-center gap-2.5 text-xs">
+                <!-- 공식 룰북 드롭다운 메뉴 -->
+                <div class="relative inline-block text-left" id="rulebookDropdownContainer">
+                    <button onclick="toggleRulebookDropdown(event)" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#161b22] hover:bg-[#21262d] border border-[#30363d] hover:border-[#58a6ff] text-gray-200 hover:text-white transition-all shadow-sm cursor-pointer focus:outline-none">
+                        <span>📖</span>
+                        <span id="rulebook-btn-text">공식 룰북</span>
+                        <span class="text-[10px] text-gray-400">▼</span>
+                    </button>
+
+                    <!-- 드롭다운 메뉴 본체 -->
+                    <div id="rulebookDropdownMenu" class="hidden absolute left-1/2 transform -translate-x-1/2 mt-2 w-56 rounded-xl bg-[#161b22] border border-[#30363d] shadow-2xl py-2 z-50 text-left">
+                        <div class="px-3 py-1 text-[11px] font-semibold text-gray-400 uppercase tracking-wider border-b border-[#21262d] mb-1" id="rulebook-menu-title">
+                            공식 PDF 다운로드
+                        </div>
+                        <a id="rb-link-base" href="" target="_blank" rel="noopener noreferrer" class="flex items-center gap-2 px-3.5 py-2 text-xs text-gray-300 hover:text-white hover:bg-[#21262d] transition-colors">
+                            <span>📦</span> <span id="rb-text-base">본판 룰북</span> <span class="ml-auto text-[10px] text-gray-500">PDF ↗</span>
+                        </a>
+                        <a id="rb-link-base-alien" href="" target="_blank" rel="noopener noreferrer" class="flex items-center gap-2 px-3.5 py-2 text-xs text-gray-300 hover:text-white hover:bg-[#21262d] transition-colors">
+                            <span>👽</span> <span id="rb-text-base-alien">본판 외계종</span> <span class="ml-auto text-[10px] text-gray-500">PDF ↗</span>
+                        </a>
+                        <a id="rb-link-aid" href="" target="_blank" rel="noopener noreferrer" class="flex items-center gap-2 px-3.5 py-2 text-xs text-gray-300 hover:text-white hover:bg-[#21262d] transition-colors">
+                            <span>📋</span> <span id="rb-text-aid">요약표</span> <span class="ml-auto text-[10px] text-gray-500">PDF ↗</span>
+                        </a>
+                        <div class="border-t border-[#21262d] my-1"></div>
+                        <a id="rb-link-exp" href="" target="_blank" rel="noopener noreferrer" class="flex items-center gap-2 px-3.5 py-2 text-xs text-gray-300 hover:text-white hover:bg-[#21262d] transition-colors">
+                            <span>🛸</span> <span id="rb-text-exp">확장 룰북</span> <span class="ml-auto text-[10px] text-gray-500">PDF ↗</span>
+                        </a>
+                        <a id="rb-link-exp-alien" href="" target="_blank" rel="noopener noreferrer" class="flex items-center gap-2 px-3.5 py-2 text-xs text-gray-300 hover:text-white hover:bg-[#21262d] transition-colors">
+                            <span>🌌</span> <span id="rb-text-exp-alien">확장 외계종</span> <span class="ml-auto text-[10px] text-gray-500">PDF ↗</span>
+                        </a>
+                    </div>
+                </div>
+
+                <!-- BGG 공식 FAQ 링크 버튼들 -->
                 <a href="https://boardgamegeek.com/thread/3392878/official-faq-plus-cards-clarification" target="_blank" rel="noopener noreferrer" 
                    class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#161b22] hover:bg-[#21262d] border border-[#30363d] hover:border-[#58a6ff] text-gray-300 hover:text-white transition-all shadow-sm">
                     <span class="text-blue-400">📦</span>
@@ -104,6 +137,28 @@
         const SHEET_ID = '1H8VjQ4cSiOKzghHHUsna8KWBzVYm-YB-GPgj_haSr88';
         const PUBLISHED_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQYjGO3WyNoP4Pg3AJ8neCz4GYD1o9wVOjWnxvyIGpmImV3KnERKDG3Q_1_TdtQxWGwC22E8CbM6SWf/pub?output=csv';
         const GVIZ_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv`;
+
+        // 공식 룰북 링크 데이터베이스 (한/영 분기)
+        const rulebookLinks = {
+            KO: {
+                btnText: "공식 룰북",
+                menuTitle: "공식 PDF 다운로드",
+                base: { title: "본판 룰북", url: "https://filemanager.czechgames.com/storage/files/seti-search-for-extraterrestrial-intelligence/rules/SE%20rulebook%20KO%2010.pdf" },
+                baseAlien: { title: "본판 외계종", url: "https://filemanager.czechgames.com/storage/files/seti-search-for-extraterrestrial-intelligence/other-downloads/alien-species/SE%20aliens%20KO%2006.pdf" },
+                aid: { title: "요약표", url: "https://filemanager.czechgames.com/storage/files/seti-search-for-extraterrestrial-intelligence/other-downloads/player-aid/SE%20player%20aid%20KO%2005.pdf" },
+                exp: { title: "확장 룰북", url: "https://filemanager.czechgames.com/storage/files/seti-space-agencies/rules/SE2%20rulebook%20KO%2003.pdf" },
+                expAlien: { title: "확장 외계종", url: "https://filemanager.czechgames.com/storage/files/seti-space-agencies/other-downloads/alien-species/SE2%20aliens%20aid%20KO%2003.pdf" }
+            },
+            EN: {
+                btnText: "Official Rulebooks",
+                menuTitle: "Official PDF Downloads",
+                base: { title: "Base Rulebook", url: "https://filemanager.czechgames.com/storage/files/seti-search-for-extraterrestrial-intelligence/rules/seti-rules-en.pdf" },
+                baseAlien: { title: "Base Alien Species", url: "https://filemanager.czechgames.com/storage/files/seti-search-for-extraterrestrial-intelligence/other-downloads/alien-species/seti-alien-species-en.pdf" },
+                aid: { title: "Player Aid", url: "https://filemanager.czechgames.com/storage/files/seti-search-for-extraterrestrial-intelligence/other-downloads/player-aid/seti-player-aid-en.pdf" },
+                exp: { title: "Expansion Rulebook", url: "https://filemanager.czechgames.com/storage/files/seti-space-agencies/rules/SE2%20rulebook%20EN%2016.pdf" },
+                expAlien: { title: "Expansion Alien Aid", url: "https://filemanager.czechgames.com/storage/files/seti-space-agencies/other-downloads/alien-species/SE2%20aliens%20aid%20EN%2014.pdf" }
+            }
+        };
 
         const categoryMap = {
             '행동': 'Actions',
@@ -172,6 +227,42 @@
             }
         };
 
+        function updateRulebookDropdown(lang) {
+            const data = rulebookLinks[lang];
+            document.getElementById('rulebook-btn-text').textContent = data.btnText;
+            document.getElementById('rulebook-menu-title').textContent = data.menuTitle;
+
+            document.getElementById('rb-link-base').href = data.base.url;
+            document.getElementById('rb-text-base').textContent = data.base.title;
+
+            document.getElementById('rb-link-base-alien').href = data.baseAlien.url;
+            document.getElementById('rb-text-base-alien').textContent = data.baseAlien.title;
+
+            document.getElementById('rb-link-aid').href = data.aid.url;
+            document.getElementById('rb-text-aid').textContent = data.aid.title;
+
+            document.getElementById('rb-link-exp').href = data.exp.url;
+            document.getElementById('rb-text-exp').textContent = data.exp.title;
+
+            document.getElementById('rb-link-exp-alien').href = data.expAlien.url;
+            document.getElementById('rb-text-exp-alien').textContent = data.expAlien.title;
+        }
+
+        function toggleRulebookDropdown(e) {
+            e.stopPropagation();
+            const menu = document.getElementById('rulebookDropdownMenu');
+            menu.classList.toggle('hidden');
+        }
+
+        // 바깥 클릭 시 드롭다운 닫기
+        window.addEventListener('click', (e) => {
+            const container = document.getElementById('rulebookDropdownContainer');
+            const menu = document.getElementById('rulebookDropdownMenu');
+            if (container && !container.contains(e.target) && menu && !menu.classList.contains('hidden')) {
+                menu.classList.add('hidden');
+            }
+        });
+
         function setLanguage(lang) {
             currentLang = lang;
             document.querySelectorAll('.lang-btn').forEach(btn => btn.classList.remove('active'));
@@ -187,6 +278,7 @@
             document.getElementById('link-bgg-base').textContent = t.bggBase;
             document.getElementById('link-bgg-exp').textContent = t.bggExp;
 
+            updateRulebookDropdown(lang);
             updateTabCounts();
             renderCategories();
             renderFAQs();
@@ -359,10 +451,8 @@
                 const qEn = item.q_en.toLowerCase();
                 const aEn = item.a_en.toLowerCase();
 
-                // 1. 질문 제목과 답변 내용 기준 검색
                 if (qKo.includes(rawQuery) || aKo.includes(rawQuery) || qEn.includes(rawQuery) || aEn.includes(rawQuery)) return true;
 
-                // 2. 카드 번호 스마트 매칭 (질문 제목 기준)
                 const cleanQuery = rawQuery.replace(/^#/, '');
                 if (/^\d+$/.test(cleanQuery)) {
                     const num = parseInt(cleanQuery, 10);
@@ -370,7 +460,6 @@
                     if (numPattern.test(qKo) || numPattern.test(qEn)) return true;
                 }
 
-                // 3. 외계종 카드 번호 스마트 매칭
                 if (/^et\s*\.?\s*\d+/i.test(rawQuery)) {
                     const etNum = rawQuery.replace(/[^0-9]/g, '');
                     const etPattern = new RegExp(`#et\\s*\\.?\\s*0*${etNum}`, 'i');
@@ -393,10 +482,8 @@
                 const edLabel = currentLang === 'EN' ? (item.edition === '확장' ? 'Expansion' : 'Base') : item.edition;
                 const catLabel = currentLang === 'EN' ? item.cat_en : item.cat_ko;
                 
-                // 단독 질문 제목 표기
                 const displayQuestion = currentLang === 'EN' ? (item.q_en || item.q_ko) : (item.q_ko || item.q_en);
 
-                // 답변 구성
                 let displayAnswer = '';
                 if (currentLang === 'EN') {
                     displayAnswer = (item.a_en || item.a_ko).replace(/\n/g, '<br>');
