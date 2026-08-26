@@ -45,8 +45,15 @@
             <h1 id="header-title" class="text-3xl sm:text-4xl font-bold text-white mb-2">🛸 SETI 보드게임 FAQ</h1>
             <p id="header-sub" class="text-gray-400 text-sm sm:text-base mb-4">규칙, 에라타 및 카드 검색 시스템</p>
             
-            <!-- 상단 외부 링크 및 드롭다운 버튼 영역 -->
+            <!-- 상단 도구 및 링크 버튼 영역 -->
             <div class="flex flex-wrap justify-center items-center gap-2.5 text-xs">
+                <!-- 외계종 발견 랜더마이저 페이지 이동 버튼 -->
+                <a href="./randomizer.html" class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-gradient-to-r from-blue-900/60 to-purple-900/60 hover:from-blue-800/80 hover:to-purple-800/80 border border-blue-500/50 hover:border-blue-400 text-white font-semibold transition-all shadow-md">
+                    <span>👾</span>
+                    <span id="link-alien-randomizer">외계종 발견 랜더마이저</span>
+                    <span class="text-gray-400 text-[10px]">→</span>
+                </a>
+
                 <!-- 공식 룰북 드롭다운 메뉴 -->
                 <div class="relative inline-block text-left" id="rulebookDropdownContainer">
                     <button onclick="toggleRulebookDropdown(event)" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#161b22] hover:bg-[#21262d] border border-[#30363d] hover:border-[#58a6ff] text-gray-200 hover:text-white transition-all shadow-sm cursor-pointer focus:outline-none">
@@ -146,7 +153,6 @@
         const PUBLISHED_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQYjGO3WyNoP4Pg3AJ8neCz4GYD1o9wVOjWnxvyIGpmImV3KnERKDG3Q_1_TdtQxWGwC22E8CbM6SWf/pub?output=csv';
         const GVIZ_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv`;
 
-        // 공식 룰북 링크 데이터베이스
         const rulebookLinks = {
             KO: {
                 btnText: "공식 룰북",
@@ -210,6 +216,7 @@
                 placeholder: "질문 제목, 답변 내용, 카드 번호(예: 15, #15, ET.1) 검색...",
                 tip: "💡 팁: 숫자만 입력해도 해당 카드 번호(#15, #120 등)를 정밀하게 자동 검색합니다.",
                 reloadText: "캐시 새로고침",
+                alienRandomizer: "외계종 발견 랜더마이저",
                 randomizer: "태양계 랜더마이저",
                 bggBase: "BGG 본판 FAQ 원본",
                 bggExp: "BGG 확장 FAQ 원본",
@@ -227,6 +234,7 @@
                 placeholder: "Search questions, answers, card # (e.g. 15, #15, ET.1)...",
                 tip: "💡 Tip: Type a pure number to automatically search for matching card #s (#15, #120, etc.).",
                 reloadText: "Clear Cache & Reload",
+                alienRandomizer: "Alien Discovery Randomizer",
                 randomizer: "Solar System Randomizer",
                 bggBase: "BGG Base FAQ (Official)",
                 bggExp: "BGG Expansion FAQ (Official)",
@@ -284,6 +292,7 @@
             document.getElementById('searchInput').placeholder = t.placeholder;
             document.getElementById('search-tip').textContent = t.tip;
             document.getElementById('reload-btn-text').textContent = t.reloadText;
+            document.getElementById('link-alien-randomizer').textContent = t.alienRandomizer;
             document.getElementById('link-randomizer').textContent = t.randomizer;
             document.getElementById('link-bgg-base').textContent = t.bggBase;
             document.getElementById('link-bgg-exp').textContent = t.bggExp;
@@ -492,10 +501,8 @@
                 const edLabel = currentLang === 'EN' ? (item.edition === '확장' ? 'Expansion' : 'Base') : item.edition;
                 const catLabel = currentLang === 'EN' ? item.cat_en : item.cat_ko;
                 
-                // 단독 질문 제목 표기
                 const displayQuestion = currentLang === 'EN' ? (item.q_en || item.q_ko) : (item.q_ko || item.q_en);
 
-                // 답변 구성
                 let displayAnswer = '';
                 if (currentLang === 'EN') {
                     displayAnswer = (item.a_en || item.a_ko).replace(/\n/g, '<br>');
