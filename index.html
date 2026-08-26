@@ -43,7 +43,23 @@
 
         <header class="text-center mb-8">
             <h1 id="header-title" class="text-3xl sm:text-4xl font-bold text-white mb-2">🛸 SETI 보드게임 FAQ</h1>
-            <p id="header-sub" class="text-gray-400 text-sm sm:text-base">규칙, 에라타 및 카드 검색 시스템</p>
+            <p id="header-sub" class="text-gray-400 text-sm sm:text-base mb-4">규칙, 에라타 및 카드 검색 시스템</p>
+            
+            <!-- BGG 공식 FAQ 원본 바로가기 링크 버튼 -->
+            <div class="flex flex-wrap justify-center gap-2.5 text-xs">
+                <a href="https://boardgamegeek.com/thread/3392878/official-faq-plus-cards-clarification" target="_blank" rel="noopener noreferrer" 
+                   class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#161b22] hover:bg-[#21262d] border border-[#30363d] hover:border-[#58a6ff] text-gray-300 hover:text-white transition-all shadow-sm">
+                    <span class="text-blue-400">📦</span>
+                    <span id="link-bgg-base">BGG 본판 FAQ 원본</span>
+                    <span class="text-gray-500 text-[10px]">↗</span>
+                </a>
+                <a href="https://boardgamegeek.com/thread/3602459/official-space-agencies-faq-plus-cards-clarificati" target="_blank" rel="noopener noreferrer" 
+                   class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#161b22] hover:bg-[#21262d] border border-[#30363d] hover:border-[#58a6ff] text-gray-300 hover:text-white transition-all shadow-sm">
+                    <span class="text-purple-400">🛸</span>
+                    <span id="link-bgg-exp">BGG 확장 FAQ 원본</span>
+                    <span class="text-gray-500 text-[10px]">↗</span>
+                </a>
+            </div>
         </header>
 
         <!-- 1차 구분 탭 (전체 / 본판 / 확장) -->
@@ -79,12 +95,9 @@
     </div>
 
     <script>
-        // PWA 서비스 워커 등록
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('./sw.js')
-                    .then(reg => console.log('Service Worker Registered'))
-                    .catch(err => console.log('Service Worker Failed', err));
+                navigator.serviceWorker.register('./sw.js').catch(err => console.log('SW registration error:', err));
             });
         }
 
@@ -134,6 +147,8 @@
                 placeholder: "질문 제목, 답변 내용, 카드 번호(예: 15, #15, ET.1) 검색...",
                 tip: "💡 팁: 숫자만 입력해도 해당 카드 번호(#15, #120 등)를 정밀하게 자동 검색합니다.",
                 reloadText: "캐시 새로고침",
+                bggBase: "BGG 본판 FAQ 원본",
+                bggExp: "BGG 확장 FAQ 원본",
                 noResult: "검색 조건에 맞는 FAQ가 없습니다.",
                 loading: "FAQ 데이터를 불러오는 중입니다...",
                 delayMsg: "데이터 로드가 지연되어 캐시를 삭제하고 자동 재시도합니다...",
@@ -148,6 +163,8 @@
                 placeholder: "Search questions, answers, card # (e.g. 15, #15, ET.1)...",
                 tip: "💡 Tip: Type a pure number to automatically search for matching card #s (#15, #120, etc.).",
                 reloadText: "Clear Cache & Reload",
+                bggBase: "BGG Base FAQ (Official)",
+                bggExp: "BGG Expansion FAQ (Official)",
                 noResult: "No FAQs match your search criteria.",
                 loading: "Loading FAQ data...",
                 delayMsg: "Loading delayed over 30s. Clearing cache and auto-retrying...",
@@ -167,6 +184,8 @@
             document.getElementById('searchInput').placeholder = t.placeholder;
             document.getElementById('search-tip').textContent = t.tip;
             document.getElementById('reload-btn-text').textContent = t.reloadText;
+            document.getElementById('link-bgg-base').textContent = t.bggBase;
+            document.getElementById('link-bgg-exp').textContent = t.bggExp;
 
             updateTabCounts();
             renderCategories();
@@ -374,6 +393,7 @@
                 const edLabel = currentLang === 'EN' ? (item.edition === '확장' ? 'Expansion' : 'Base') : item.edition;
                 const catLabel = currentLang === 'EN' ? item.cat_en : item.cat_ko;
                 
+                // 단독 질문 제목 표기
                 const displayQuestion = currentLang === 'EN' ? (item.q_en || item.q_ko) : (item.q_ko || item.q_en);
 
                 // 답변 구성
