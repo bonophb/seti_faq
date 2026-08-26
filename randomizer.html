@@ -19,6 +19,8 @@
         .lang-btn { background-color: #161b22; border: 1px solid #30363d; color: #8b949e; }
         .lang-btn.active { background-color: #1f6beb; border-color: #388bfd; color: #ffffff; font-weight: 600; }
         .glass-card { background-color: #161b22; border: 1px solid #30363d; }
+        .alien-card { transition: all 0.2s ease; }
+        .alien-card:hover { transform: translateY(-2px); }
     </style>
 </head>
 <body class="min-h-screen py-8 px-4 sm:px-6 lg:px-8">
@@ -104,10 +106,10 @@
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <!-- 왼쪽 외계종 슬롯 -->
-                <div id="slot-left" class="glass-card p-6 rounded-2xl text-center flex flex-col justify-between min-h-[220px] transition-all">
+                <div id="slot-left" class="glass-card p-6 rounded-2xl text-center flex flex-col justify-between min-h-[230px] transition-all">
                     <div>
                         <span class="text-xs font-semibold px-2.5 py-1 rounded-md bg-blue-900/50 text-blue-300 border border-blue-700/50" id="label-left-slot">왼쪽 외계종</span>
-                        <div id="left-result" class="my-6">
+                        <div id="left-result" class="my-5">
                             <span class="text-gray-500 text-sm" id="text-left-empty">미선택 상태</span>
                         </div>
                     </div>
@@ -117,10 +119,10 @@
                 </div>
 
                 <!-- 오른쪽 외계종 슬롯 -->
-                <div id="slot-right" class="glass-card p-6 rounded-2xl text-center flex flex-col justify-between min-h-[220px] transition-all">
+                <div id="slot-right" class="glass-card p-6 rounded-2xl text-center flex flex-col justify-between min-h-[230px] transition-all">
                     <div>
                         <span class="text-xs font-semibold px-2.5 py-1 rounded-md bg-purple-900/50 text-purple-300 border border-purple-700/50" id="label-right-slot">오른쪽 외계종</span>
-                        <div id="right-result" class="my-6">
+                        <div id="right-result" class="my-5">
                             <span class="text-gray-500 text-sm" id="text-right-empty">미선택 상태</span>
                         </div>
                     </div>
@@ -165,44 +167,40 @@
     </div>
 
     <script>
-        // PWA 서비스 워커 등록
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('./sw.js').catch(err => console.log('SW error:', err));
             });
         }
 
-        // 외계종 마스터 데이터베이스
+        // 외계종 마스터 데이터베이스 (지정 고유 색상 적용)
         const ALIEN_SPECIES = [
             // 본판 (5종)
-            { id: 'mascamites', ko: '마스카마이트', en: 'MASCAMITES', exp: false, color: '#1d4ed8' },
-            { id: 'anomalies', ko: '어노말리', en: 'ANOMALIES', exp: false, color: '#7e22ce' },
-            { id: 'oumuamua', ko: '오우무아무아', en: '‘OUMUAMUA', exp: false, color: '#b45309' },
-            { id: 'centaurians', ko: '센타우리안', en: 'CENTAURIANS', exp: false, color: '#0e7490' },
-            { id: 'exertians', ko: '엑설티안', en: 'EXERTIANS', exp: false, color: '#b91c1c' },
+            { id: 'mascamites', ko: '마스카마이트', en: 'MASCAMITES', exp: false, color: '#a28817' },
+            { id: 'anomalies', ko: '어노말리', en: 'ANOMALIES', exp: false, color: '#004c66' },
+            { id: 'oumuamua', ko: '오우무아무아', en: '‘OUMUAMUA', exp: false, color: '#313469' },
+            { id: 'centaurians', ko: '센타우리안', en: 'CENTAURIANS', exp: false, color: '#004c3f' },
+            { id: 'exertians', ko: '엑설티안', en: 'EXERTIANS', exp: false, color: '#bd0306' },
             // 확장 (3종)
-            { id: 'arkhos', ko: '아르코스', en: 'ARKHOS', exp: true, color: '#047857' },
-            { id: 'glyphids', ko: '글리피즈', en: 'GLYPHIDS', exp: true, color: '#be185d' },
-            { id: 'amoeba', ko: '아메바', en: 'AMOEBA', exp: true, color: '#c2410c' }
+            { id: 'arkhos', ko: '아르코스', en: 'ARKHOS', exp: true, color: '#8f0334' },
+            { id: 'glyphids', ko: '글리피즈', en: 'GLYPHIDS', exp: true, color: '#0c5f11' },
+            { id: 'amoeba', ko: '아메바', en: 'AMOEBA', exp: true, color: '#b7007e' }
         ];
 
-        // 브라우저 언어 자동 감지
         function detectLanguage() {
             const userLang = (navigator.language || navigator.userLanguage || '').toLowerCase();
             return userLang.startsWith('ko') ? 'KO' : 'EN';
         }
 
-        // 상태 변수
         let currentLang = detectLanguage();
         let appState = {
-            step: 'mode', // 'mode', 'ban', 'slots'
-            mode: null,   // 'BASE', 'EXP'
-            banned: [],   // [id, ...]
+            step: 'mode',
+            mode: null,
+            banned: [],
             leftWinner: null,
             rightWinner: null
         };
 
-        // 로컬스토리지 복원
         function loadState() {
             const saved = localStorage.getItem('seti_randomizer_state');
             if (saved) {
@@ -219,7 +217,6 @@
             localStorage.setItem('seti_randomizer_lang', currentLang);
         }
 
-        // 다국어 텍스트 사전
         const i18n = {
             KO: {
                 title: "👾 외계종 발견 랜더마이저",
@@ -347,7 +344,6 @@
             const isCurrentlyBanned = appState.banned.includes(id);
 
             if (!isCurrentlyBanned) {
-                // 밴을 추가하려고 할 때: 잔여 외계종이 2종 이하가 되는지 검사
                 const remainingCount = currentPool.length - (appState.banned.length + 1);
                 if (remainingCount < 2) {
                     showToast(i18n[currentLang].warnMin);
@@ -358,7 +354,6 @@
                 appState.banned = appState.banned.filter(bId => bId !== id);
             }
 
-            // 밴이 바뀌면 이전 슬롯 결과 초기화
             appState.leftWinner = null;
             appState.rightWinner = null;
             saveState();
@@ -396,7 +391,7 @@
                 card.onclick = () => toggleBan(item.id);
 
                 card.innerHTML = `
-                    <div class="w-8 h-8 rounded-full mx-auto mb-2 flex items-center justify-center font-bold text-white text-xs" style="background-color: ${item.color}">
+                    <div class="w-8 h-8 rounded-full mx-auto mb-2 flex items-center justify-center font-bold text-white text-xs shadow-md" style="background-color: ${item.color}">
                         ${item.id[0].toUpperCase()}
                     </div>
                     <div class="text-sm font-bold text-white ${isBanned ? 'line-through text-gray-500' : ''}">${name}</div>
@@ -417,9 +412,12 @@
                 const sp = ALIEN_SPECIES.find(s => s.id === appState.leftWinner);
                 const name = currentLang === 'KO' ? sp.ko : sp.en;
                 leftResult.innerHTML = `
-                    <div class="p-4 rounded-xl border border-blue-500/50 bg-blue-950/30">
-                        <div class="text-2xl font-black text-blue-300">${name}</div>
-                        <div class="text-xs text-gray-400 mt-1">${sp.en}</div>
+                    <div class="p-4 rounded-xl border shadow-lg transition-all" style="border-color: ${sp.color}; background-color: ${sp.color}25;">
+                        <div class="w-8 h-8 rounded-full mx-auto mb-2 flex items-center justify-center font-bold text-white text-xs shadow" style="background-color: ${sp.color};">
+                            ${sp.id[0].toUpperCase()}
+                        </div>
+                        <div class="text-2xl font-black text-white drop-shadow">${name}</div>
+                        <div class="text-xs text-gray-300 mt-1 font-medium">${sp.en}</div>
                     </div>
                 `;
                 btnSpinLeft.classList.add('hidden');
@@ -435,9 +433,12 @@
                 const sp = ALIEN_SPECIES.find(s => s.id === appState.rightWinner);
                 const name = currentLang === 'KO' ? sp.ko : sp.en;
                 rightResult.innerHTML = `
-                    <div class="p-4 rounded-xl border border-purple-500/50 bg-purple-950/30">
-                        <div class="text-2xl font-black text-purple-300">${name}</div>
-                        <div class="text-xs text-gray-400 mt-1">${sp.en}</div>
+                    <div class="p-4 rounded-xl border shadow-lg transition-all" style="border-color: ${sp.color}; background-color: ${sp.color}25;">
+                        <div class="w-8 h-8 rounded-full mx-auto mb-2 flex items-center justify-center font-bold text-white text-xs shadow" style="background-color: ${sp.color};">
+                            ${sp.id[0].toUpperCase()}
+                        </div>
+                        <div class="text-2xl font-black text-white drop-shadow">${name}</div>
+                        <div class="text-xs text-gray-300 mt-1 font-medium">${sp.en}</div>
                     </div>
                 `;
                 btnSpinRight.classList.add('hidden');
@@ -459,24 +460,22 @@
         // ==========================================
         // 원형 돌림판 (Canvas 룰렛) 추첨 엔진
         // ==========================================
-        let currentSlotTarget = null; // 'LEFT' or 'RIGHT'
+        let currentSlotTarget = null;
         let wheelCandidates = [];
         let currentRotation = 0;
         let isSpinning = false;
         let isStopping = false;
         let animationFrameId = null;
-        let spinStartTime = 0;
         let stopStartTime = 0;
         let startRotationAtStop = 0;
         let targetFinalRotation = 0;
-        let stopDuration = 3800; // 3.8초 동안 감속 정지
+        let stopDuration = 3800;
 
         function openWheelModal(slot) {
             currentSlotTarget = slot;
             const t = i18n[currentLang];
             document.getElementById('wheel-modal-title').textContent = slot === 'LEFT' ? t.wheelTitleLeft : t.wheelTitleRight;
 
-            // 추첨 후보 풀 구성: (전체 외계종) - (모드 외) - (밴 외계종) - (반대편 슬롯 당첨 외계종)
             const oppositeWinner = slot === 'LEFT' ? appState.rightWinner : appState.leftWinner;
             wheelCandidates = ALIEN_SPECIES.filter(s => {
                 const matchesMode = appState.mode === 'EXP' || !s.exp;
@@ -495,7 +494,7 @@
         }
 
         function closeWheelModal() {
-            if (isSpinning && !isStopping) return; // 회전 중 닫기 방지
+            if (isSpinning && !isStopping) return;
             cancelAnimationFrame(animationFrameId);
             document.getElementById('wheelModal').classList.add('hidden');
         }
@@ -522,28 +521,22 @@
 
         function handleSpinAction() {
             if (!isSpinning) {
-                // 회전 시작
                 isSpinning = true;
                 isStopping = false;
-                spinStartTime = performance.now();
                 updateSpinButtonState();
                 requestAnimationFrame(animateInfiniteSpin);
             } else if (isSpinning && !isStopping) {
-                // 멈추기 버튼 클릭: 내부 무작위 당첨자 선정 및 감속 애니메이션 개시
                 isStopping = true;
                 stopStartTime = performance.now();
                 startRotationAtStop = currentRotation;
                 updateSpinButtonState();
 
-                // 1. 내부 무작위 1/N 균등 확률 당첨자 선정
                 const winnerIndex = Math.floor(Math.random() * wheelCandidates.length);
                 const winner = wheelCandidates[winnerIndex];
 
-                // 2. 12시 방향 상단 화살표에 정확히 멈추기 위한 회전각 계산
                 const sliceAngle = (Math.PI * 2) / wheelCandidates.length;
                 const winnerCenterAngle = (winnerIndex + 0.5) * sliceAngle;
                 
-                // 3~4바퀴 추가 회전 + 상단 12시(3π/2) 정렬
                 const fullRotations = Math.PI * 2 * 4;
                 const currentMod = currentRotation % (Math.PI * 2);
                 let targetMod = (Math.PI * 1.5 - winnerCenterAngle) % (Math.PI * 2);
@@ -552,7 +545,6 @@
                 let delta = targetMod - currentMod;
                 if (delta < 0) delta += Math.PI * 2;
 
-                // 조각 내부 자연스러운 랜덤 오차 (가장자리 경계선 침범 방지)
                 const safeJitter = (Math.random() - 0.5) * (sliceAngle * 0.5);
                 targetFinalRotation = currentRotation + fullRotations + delta + safeJitter;
 
@@ -560,14 +552,13 @@
             }
         }
 
-        function animateInfiniteSpin(timestamp) {
+        function animateInfiniteSpin() {
             if (!isSpinning || isStopping) return;
-            currentRotation += 0.35; // 고속 회전 속도
+            currentRotation += 0.35;
             drawWheel(currentRotation);
             animationFrameId = requestAnimationFrame(animateInfiniteSpin);
         }
 
-        // Cubic Ease-Out 감속 곡선
         function easeOutCubic(t) {
             return 1 - Math.pow(1 - t, 3);
         }
@@ -583,7 +574,6 @@
             if (progress < 1) {
                 animationFrameId = requestAnimationFrame((t) => animateDeceleration(t, winner));
             } else {
-                // 추첨 완료
                 isSpinning = false;
                 isStopping = false;
                 
@@ -625,7 +615,7 @@
                 const angleStart = i * sliceAngle;
                 const angleEnd = (i + 1) * sliceAngle;
 
-                // 섹터 부채꼴 그리기
+                // 고유색 부채꼴 섹터 렌더링
                 ctx.beginPath();
                 ctx.moveTo(0, 0);
                 ctx.arc(0, 0, radius, angleStart, angleEnd);
@@ -633,12 +623,11 @@
                 ctx.fillStyle = item.color;
                 ctx.fill();
 
-                // 섹터 테두리선
                 ctx.strokeStyle = '#0d1117';
                 ctx.lineWidth = 6;
                 ctx.stroke();
 
-                // 외계종 명칭 텍스트 렌더링
+                // 외계종 텍스트 렌더링
                 ctx.save();
                 ctx.rotate(angleStart + sliceAngle / 2);
                 ctx.textAlign = 'right';
@@ -652,7 +641,7 @@
                 ctx.restore();
             }
 
-            // 중앙 허브 서클
+            // 중앙 원형 허브
             ctx.beginPath();
             ctx.arc(0, 0, 36, 0, Math.PI * 2);
             ctx.fillStyle = '#0d1117';
@@ -664,7 +653,7 @@
             ctx.restore();
         }
 
-        // 초기 로드 실행
+        // 초기 실행
         loadState();
         setLanguage(currentLang);
     </script>
