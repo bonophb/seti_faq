@@ -45,7 +45,7 @@
             <h1 id="header-title" class="text-3xl sm:text-4xl font-bold text-white mb-2">🛸 SETI 보드게임 FAQ</h1>
             <p id="header-sub" class="text-gray-400 text-sm sm:text-base mb-4">규칙, 에라타 및 카드 검색 시스템</p>
             
-            <!-- 공식 룰북 드롭다운 & BGG 링크 영역 -->
+            <!-- 상단 외부 링크 및 드롭다운 버튼 영역 -->
             <div class="flex flex-wrap justify-center items-center gap-2.5 text-xs">
                 <!-- 공식 룰북 드롭다운 메뉴 -->
                 <div class="relative inline-block text-left" id="rulebookDropdownContainer">
@@ -78,6 +78,14 @@
                         </a>
                     </div>
                 </div>
+
+                <!-- 태양계 랜더마이저 버튼 -->
+                <a href="https://seti-solarsystem.czechgames.com/" target="_blank" rel="noopener noreferrer" 
+                   class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#161b22] hover:bg-[#21262d] border border-[#30363d] hover:border-[#58a6ff] text-gray-300 hover:text-white transition-all shadow-sm">
+                    <span>🪐</span>
+                    <span id="link-randomizer">태양계 랜더마이저</span>
+                    <span class="text-gray-500 text-[10px]">↗</span>
+                </a>
 
                 <!-- BGG 공식 FAQ 링크 버튼들 -->
                 <a href="https://boardgamegeek.com/thread/3392878/official-faq-plus-cards-clarification" target="_blank" rel="noopener noreferrer" 
@@ -138,7 +146,7 @@
         const PUBLISHED_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQYjGO3WyNoP4Pg3AJ8neCz4GYD1o9wVOjWnxvyIGpmImV3KnERKDG3Q_1_TdtQxWGwC22E8CbM6SWf/pub?output=csv';
         const GVIZ_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv`;
 
-        // 공식 룰북 링크 데이터베이스 (한/영 분기)
+        // 공식 룰북 링크 데이터베이스
         const rulebookLinks = {
             KO: {
                 btnText: "공식 룰북",
@@ -202,6 +210,7 @@
                 placeholder: "질문 제목, 답변 내용, 카드 번호(예: 15, #15, ET.1) 검색...",
                 tip: "💡 팁: 숫자만 입력해도 해당 카드 번호(#15, #120 등)를 정밀하게 자동 검색합니다.",
                 reloadText: "캐시 새로고침",
+                randomizer: "태양계 랜더마이저",
                 bggBase: "BGG 본판 FAQ 원본",
                 bggExp: "BGG 확장 FAQ 원본",
                 noResult: "검색 조건에 맞는 FAQ가 없습니다.",
@@ -218,6 +227,7 @@
                 placeholder: "Search questions, answers, card # (e.g. 15, #15, ET.1)...",
                 tip: "💡 Tip: Type a pure number to automatically search for matching card #s (#15, #120, etc.).",
                 reloadText: "Clear Cache & Reload",
+                randomizer: "Solar System Randomizer",
                 bggBase: "BGG Base FAQ (Official)",
                 bggExp: "BGG Expansion FAQ (Official)",
                 noResult: "No FAQs match your search criteria.",
@@ -254,7 +264,6 @@
             menu.classList.toggle('hidden');
         }
 
-        // 바깥 클릭 시 드롭다운 닫기
         window.addEventListener('click', (e) => {
             const container = document.getElementById('rulebookDropdownContainer');
             const menu = document.getElementById('rulebookDropdownMenu');
@@ -275,6 +284,7 @@
             document.getElementById('searchInput').placeholder = t.placeholder;
             document.getElementById('search-tip').textContent = t.tip;
             document.getElementById('reload-btn-text').textContent = t.reloadText;
+            document.getElementById('link-randomizer').textContent = t.randomizer;
             document.getElementById('link-bgg-base').textContent = t.bggBase;
             document.getElementById('link-bgg-exp').textContent = t.bggExp;
 
@@ -482,8 +492,10 @@
                 const edLabel = currentLang === 'EN' ? (item.edition === '확장' ? 'Expansion' : 'Base') : item.edition;
                 const catLabel = currentLang === 'EN' ? item.cat_en : item.cat_ko;
                 
+                // 단독 질문 제목 표기
                 const displayQuestion = currentLang === 'EN' ? (item.q_en || item.q_ko) : (item.q_ko || item.q_en);
 
+                // 답변 구성
                 let displayAnswer = '';
                 if (currentLang === 'EN') {
                     displayAnswer = (item.a_en || item.a_ko).replace(/\n/g, '<br>');
