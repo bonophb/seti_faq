@@ -62,7 +62,7 @@
 
                 <!-- 공식 룰북 드롭다운 메뉴 -->
                 <div class="relative inline-block text-left" id="rulebookDropdownContainer">
-                    <button onclick="toggleRulebookDropdown(event)" class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-[#161b22] hover:bg-[#21262d] border border-[#30363d] hover:border-[#58a6ff] text-gray-200 hover:text-white transition-all shadow-sm cursor-pointer focus:outline-none">
+                    <button onclick="toggleRulebookDropdown(event)" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#161b22] hover:bg-[#21262d] border border-[#30363d] hover:border-[#58a6ff] text-gray-200 hover:text-white transition-all shadow-sm cursor-pointer focus:outline-none">
                         <span>📖</span>
                         <span id="rulebook-btn-text">공식 룰북</span>
                         <span class="text-[10px] text-gray-400">▼</span>
@@ -470,27 +470,32 @@
             }
         }
 
-        // 고유 중복 방지 Slug 생성기
+        // 완벽한 고유 식별자(Slug) 생성 엔진
         function generateFaqSlug(item, index) {
             const isExp = item.edition === '확장' || (item.cat_ko && item.cat_ko.includes('확장'));
-            const str = (item.q_en || '') + ' ' + (item.q_ko || '');
-            const cat = item.cat_ko || '';
+            const str = ((item.q_en || '') + ' ' + (item.q_ko || '')).trim();
+            const catKo = (item.cat_ko || '').toLowerCase();
+            const catEn = (item.cat_en || '').toLowerCase();
 
             // 1. 프로모 카드 (#SE EN 01, #SE EN 03 등)
-            const seMatch = str.match(/#SE\s*EN\s*0*(\d+)/i);
-            if (seMatch) {
-                const num = parseInt(seMatch[1], 10);
-                return `promo-se-en-${num < 10 ? '0' + num : num}`;
+            if (catKo.includes('프로모') || catEn.includes('promo') || /#SE\s*EN/i.test(str)) {
+                const seMatch = str.match(/#SE\s*EN\s*0*(\d+)/i);
+                if (seMatch) {
+                    const num = parseInt(seMatch[1], 10);
+                    return `promo-se-en-${num < 10 ? '0' + num : num}`;
+                }
             }
 
             // 2. 솔로 모드 행동 카드 (#S.15 ~ #S.19)
-            const sMatch = str.match(/#S\.0*(\d+)/i);
-            if (sMatch) {
-                return `solo-s-${parseInt(sMatch[1], 10)}`;
+            if (catKo.includes('솔로') || catEn.includes('solo') || /#S\.\d+/i.test(str)) {
+                const sMatch = str.match(/#S\.0*(\d+)/i);
+                if (sMatch) {
+                    return `solo-s-${parseInt(sMatch[1], 10)}`;
+                }
             }
 
-            // 3. 우주 기관 (#1 ~ #11) -> org-10 형태로 고유화
-            if (cat === '기관' || str.includes('ORGANIZATIONS') || str.includes('기관')) {
+            // 3. 우주 기관 (#1 ~ #11) -> org-1 ~ org-11 최우선 매핑
+            if (catKo.includes('기관') || catEn.includes('organization') || catEn.includes('agency') || catKo.includes('기구') || /#\d+\s*(orbital|fenwick|stratus|deep sky|turing|cosmos|sentinel|mission relay|xenolab|futurespan|helion)/i.test(str)) {
                 const orgMatch = str.match(/#0*(\d+)/);
                 if (orgMatch) {
                     return `org-${parseInt(orgMatch[1], 10)}`;
@@ -498,10 +503,12 @@
             }
 
             // 4. 외계종 카드 (#ET.1 ~ #ET.40)
-            const etMatch = str.match(/#ET\s*\.?\s*0*(\d+)/i);
-            if (etMatch) {
-                const etNum = parseInt(etMatch[1], 10);
-                return isExp ? `exp-et-${etNum}` : `et-${etNum}`;
+            if (catKo.includes('외계') || catEn.includes('alien') || /#ET\s*\.?\s*\d+/i.test(str)) {
+                const etMatch = str.match(/#ET\s*\.?\s*0*(\d+)/i);
+                if (etMatch) {
+                    const etNum = parseInt(etMatch[1], 10);
+                    return isExp ? `exp-et-${etNum}` : `et-${etNum}`;
+                }
             }
 
             // 5. 일반 카드 (#1 ~ #138 등)
@@ -511,7 +518,7 @@
                 return isExp ? `exp-card-${cardNum}` : `card-${cardNum}`;
             }
 
-            // 6. 기타 규칙 FAQ
+            // 6. 기타 일반 규칙 FAQ
             return `faq-${item.id !== undefined ? item.id + 1 : index + 1}`;
         }
 
@@ -555,7 +562,7 @@
                 }
             }
 
-            // 2단계: 호환성 및 키워드 매칭
+            // 2단계: 유연한 접두사 호환성 매칭
             if (!targetItem) {
                 for (let i = 0; i < faqData.length; i++) {
                     const item = faqData[i];
