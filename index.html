@@ -62,7 +62,7 @@
 
                 <!-- 공식 룰북 드롭다운 메뉴 -->
                 <div class="relative inline-block text-left" id="rulebookDropdownContainer">
-                    <button onclick="toggleRulebookDropdown(event)" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#161b22] hover:bg-[#21262d] border border-[#30363d] hover:border-[#58a6ff] text-gray-200 hover:text-white transition-all shadow-sm cursor-pointer focus:outline-none">
+                    <button onclick="toggleRulebookDropdown(event)" class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-[#161b22] hover:bg-[#21262d] border border-[#30363d] hover:border-[#58a6ff] text-gray-200 hover:text-white transition-all shadow-sm cursor-pointer focus:outline-none">
                         <span>📖</span>
                         <span id="rulebook-btn-text">공식 룰북</span>
                         <span class="text-[10px] text-gray-400">▼</span>
@@ -94,7 +94,7 @@
 
                 <!-- 태양계 랜더마이저 버튼 -->
                 <a href="https://seti-solarsystem.czechgames.com/" target="_blank" rel="noopener noreferrer" 
-                   class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#161b22] hover:bg-[#21262d] border border-[#30363d] hover:border-[#58a6ff] text-gray-300 hover:text-white transition-all shadow-sm">
+                   class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-[#161b22] hover:bg-[#21262d] border border-[#30363d] hover:border-[#58a6ff] text-gray-300 hover:text-white transition-all shadow-sm">
                     <span>🪐</span>
                     <span id="link-randomizer">태양계 랜더마이저</span>
                     <span class="text-gray-500 text-[10px]">↗</span>
@@ -377,7 +377,7 @@
                         const a_en = item['답변 (EN)'] ? item['답변 (EN)'].trim() : a_ko;
 
                         return {
-                            id: idx,
+                            id: idx, // 고유 Master ID 고정
                             edition: ed,
                             cat_ko: cat_ko,
                             cat_en: cat_en,
@@ -463,19 +463,37 @@
             });
         }
 
-        function toggleEnOriginal(index) {
-            const box = document.getElementById(`en-box-${index}`);
+        function toggleEnOriginal(id) {
+            const box = document.getElementById(`en-box-${id}`);
             if (box) {
                 box.classList.toggle('hidden');
             }
         }
 
+        // 지능형 Slug 생성기 (프로모, 외계종, 일반 카드 번호 정밀 인식)
         function generateFaqSlug(item, index) {
-            const match = item.q_ko.match(/#([a-zA-Z0-9.\s]+)/);
-            if (match) {
-                return 'card-' + match[1].trim().toLowerCase().replace(/\s+/g, '-').replace(/\./g, '-');
+            const str = (item.q_en || '') + ' ' + (item.q_ko || '');
+            
+            // 1. 프로모 카드 (#SE EN 03, #SE EN 01 등)
+            const seMatch = str.match(/#SE\s*EN\s*0*(\d+)/i);
+            if (seMatch) {
+                const num = parseInt(seMatch[1], 10);
+                return `card-se-en-${num < 10 ? '0' + num : num}`;
             }
-            return 'faq-' + (index + 1);
+
+            // 2. 외계종 카드 (#ET.14, #ET.3 등)
+            const etMatch = str.match(/#ET\s*\.?\s*0*(\d+)/i);
+            if (etMatch) {
+                return `card-et-${parseInt(etMatch[1], 10)}`;
+            }
+
+            // 3. 일반 카드 (#15, #120 등)
+            const numMatch = str.match(/#0*(\d+)/);
+            if (numMatch) {
+                return `card-${parseInt(numMatch[1], 10)}`;
+            }
+
+            return `faq-${index + 1}`;
         }
 
         function copyFaqLink(slug, event) {
@@ -501,20 +519,36 @@
             showToast(currentLang === 'KO' ? "🔗 해당 FAQ 공유 링크가 복사되었습니다!" : "🔗 FAQ link copied to clipboard!", "🔗");
         }
 
+        // 지능형 딥링크 추적 엔진
         function checkDeepLink() {
-            const hash = window.location.hash.replace('#', '').trim().toLowerCase();
-            if (!hash || faqData.length === 0) return;
+            const rawHash = window.location.hash.replace('#', '').trim().toLowerCase();
+            if (!rawHash || faqData.length === 0) return;
 
-            const targetIndex = faqData.findIndex((item, idx) => {
-                const slug = generateFaqSlug(item, idx);
-                const cleanHash = hash.replace(/^card-/, '');
-                return slug === hash || slug === 'card-' + hash || slug === ('card-' + cleanHash) || slug === ('faq-' + hash);
-            });
+            let targetItem = null;
 
-            if (targetIndex !== -1) {
-                const item = faqData[targetIndex];
-                
-                currentEdition = item.edition;
+            for (let i = 0; i < faqData.length; i++) {
+                const item = faqData[i];
+                const slug = generateFaqSlug(item, i);
+
+                // Slug 일치 검사
+                if (slug === rawHash || slug === 'card-' + rawHash || ('card-' + slug) === rawHash) {
+                    targetItem = item;
+                    break;
+                }
+
+                // 키워드 직접 매칭 (예: "card-se-en-03" -> "se en 03" 또는 "se-en-03")
+                const cleanKey = rawHash.replace(/^card-/, '').replace(/[-_]/g, ' ');
+                const qKo = item.q_ko.toLowerCase();
+                const qEn = item.q_en.toLowerCase();
+                if (qKo.includes(cleanKey) || qEn.includes(cleanKey) || qKo.includes(rawHash) || qEn.includes(rawHash)) {
+                    targetItem = item;
+                    break;
+                }
+            }
+
+            if (targetItem) {
+                // 본판/확장 탭 자동 전환
+                currentEdition = targetItem.edition;
                 currentCategory = '전체';
                 document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
                 const activeTab = document.getElementById(`tab-${currentEdition}`);
@@ -523,25 +557,31 @@
                 renderCategories();
                 renderFAQs();
 
-                const answer = document.getElementById(`answer-${targetIndex}`);
-                const icon = document.getElementById(`icon-${targetIndex}`);
+                // 고유 ID 기반 아코디언 열기
+                const targetId = targetItem.id;
+                const answer = document.getElementById(`answer-${targetId}`);
+                const icon = document.getElementById(`icon-${targetId}`);
                 if (answer && answer.classList.contains('hidden')) {
                     answer.classList.remove('hidden');
                     if (icon) icon.textContent = '−';
                 }
 
+                // 부드러운 스크롤 & 파란색 하이라이트 애니메이션
                 setTimeout(() => {
-                    const cardEl = document.getElementById(`faq-card-${targetIndex}`);
+                    const cardEl = document.getElementById(`faq-card-${targetId}`);
                     if (cardEl) {
                         cardEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
                         cardEl.classList.add('ring-2', 'ring-blue-500', 'shadow-[0_0_25px_rgba(59,130,246,0.6)]');
                         setTimeout(() => {
                             cardEl.classList.remove('ring-2', 'ring-blue-500', 'shadow-[0_0_25px_rgba(59,130,246,0.6)]');
-                        }, 3000);
+                        }, 3500);
                     }
-                }, 300);
+                }, 250);
             }
         }
+
+        // URL 해시 변경 실시간 감지
+        window.addEventListener('hashchange', checkDeepLink);
 
         function renderFAQs() {
             const rawQuery = document.getElementById('searchInput').value.toLowerCase().trim();
@@ -600,8 +640,8 @@
                 const displayAnswer = currentLang === 'EN' ? (item.a_en || item.a_ko).replace(/\n/g, '<br>') : item.a_ko.replace(/\n/g, '<br>');
 
                 return `
-                <div class="faq-item rounded-2xl overflow-hidden" id="faq-card-${index}">
-                    <button onclick="toggleFAQ(${index})" class="w-full text-left p-5 flex justify-between items-center focus:outline-none cursor-pointer">
+                <div class="faq-item rounded-2xl overflow-hidden" id="faq-card-${item.id}">
+                    <button onclick="toggleFAQ(${item.id})" class="w-full text-left p-5 flex justify-between items-center focus:outline-none cursor-pointer">
                         <div>
                             <div class="flex gap-2 items-center mb-2.5">
                                 <span class="text-xs px-2.5 py-1 rounded-md font-semibold ${badgeColor}">${edLabel}</span>
@@ -609,11 +649,11 @@
                             </div>
                             <h3 class="text-lg font-semibold text-white leading-snug">${displayQuestion}</h3>
                         </div>
-                        <span id="icon-${index}" class="text-gray-400 text-xl ml-4 font-bold">+</span>
+                        <span id="icon-${item.id}" class="text-gray-400 text-xl ml-4 font-bold">+</span>
                     </button>
 
-                    <!-- 답변 펼침 영역 -->
-                    <div id="answer-${index}" class="hidden px-5 pb-5 pt-1 bg-[#0d1117]/50 border-t border-[#21262d]">
+                    <!-- 답변 영역 -->
+                    <div id="answer-${item.id}" class="hidden px-5 pb-5 pt-1 bg-[#0d1117]/50 border-t border-[#21262d]">
                         <!-- 독립된 답변 블록 카드 -->
                         <div class="p-4 rounded-xl bg-[#161b22] border border-[#30363d] text-sm text-gray-200 leading-relaxed shadow-inner">
                             ${displayAnswer}
@@ -621,7 +661,7 @@
 
                         <!-- 영어 원문 보기 블록 (토글 시 노출) -->
                         ${currentLang === 'KO' && item.a_en && item.a_en !== item.a_ko ? `
-                            <div id="en-box-${index}" class="hidden mt-3 p-4 rounded-xl bg-[#161b22] border border-blue-900/50 text-xs sm:text-sm text-gray-300 leading-relaxed space-y-2">
+                            <div id="en-box-${item.id}" class="hidden mt-3 p-4 rounded-xl bg-[#161b22] border border-blue-900/50 text-xs sm:text-sm text-gray-300 leading-relaxed space-y-2">
                                 <div class="font-bold text-blue-300 border-b border-[#30363d] pb-2 flex items-center gap-1.5">
                                     <span>🇺🇸</span> <span>${item.q_en}</span>
                                 </div>
@@ -633,7 +673,7 @@
                         <div class="mt-3 flex flex-wrap items-center justify-between gap-2">
                             <div>
                                 ${currentLang === 'KO' && item.a_en && item.a_en !== item.a_ko ? `
-                                    <button onclick="toggleEnOriginal(${index})" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#21262d] hover:bg-[#30363d] border border-[#30363d] hover:border-[#58a6ff] text-xs font-medium text-gray-200 hover:text-white transition-all shadow-sm focus:outline-none cursor-pointer">
+                                    <button onclick="toggleEnOriginal(${item.id})" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#21262d] hover:bg-[#30363d] border border-[#30363d] hover:border-[#58a6ff] text-xs font-medium text-gray-200 hover:text-white transition-all shadow-sm focus:outline-none cursor-pointer">
                                         <span>🇺🇸</span>
                                         <span>영어 원문 보기</span>
                                     </button>
@@ -652,16 +692,16 @@
             }).join('');
         }
 
-        function toggleFAQ(index) {
-            const answer = document.getElementById(`answer-${index}`);
-            const icon = document.getElementById(`icon-${index}`);
+        function toggleFAQ(id) {
+            const answer = document.getElementById(`answer-${id}`);
+            const icon = document.getElementById(`icon-${id}`);
             
-            if (answer.classList.contains('hidden')) {
+            if (answer && answer.classList.contains('hidden')) {
                 answer.classList.remove('hidden');
-                icon.textContent = '−';
-            } else {
+                if (icon) icon.textContent = '−';
+            } else if (answer) {
                 answer.classList.add('hidden');
-                icon.textContent = '+';
+                if (icon) icon.textContent = '+';
             }
         }
 
