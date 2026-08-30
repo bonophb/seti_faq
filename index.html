@@ -474,7 +474,6 @@
             }
         }
 
-        // 고유 식별자(Slug) 생성
         function generateFaqSlug(item, index) {
             const match = item.q_ko.match(/#([a-zA-Z0-9.\s]+)/);
             if (match) {
@@ -483,7 +482,6 @@
             return 'faq-' + (index + 1);
         }
 
-        // 1. 딥링크 복사 기능
         function copyFaqLink(slug, event) {
             if (event) event.stopPropagation();
             const url = `${window.location.origin}${window.location.pathname}#${slug}`;
@@ -507,13 +505,11 @@
             showToast(currentLang === 'KO' ? "🔗 해당 FAQ 공유 링크가 복사되었습니다!" : "🔗 FAQ link copied to clipboard!", "🔗");
         }
 
-        // 2. 이미지 클립보드 복사 기능 (html2canvas 활용)
         async function copyFaqAsImage(index, event) {
             if (event) event.stopPropagation();
             const card = document.getElementById(`faq-card-${index}`);
             if (!card) return;
 
-            // 답변이 닫혀있다면 먼저 펼침
             const answer = document.getElementById(`answer-${index}`);
             const icon = document.getElementById(`icon-${index}`);
             if (answer && answer.classList.contains('hidden')) {
@@ -533,7 +529,8 @@
                     backgroundColor: '#161b22',
                     scale: 2,
                     useCORS: true,
-                    logging: false
+                    logging: false,
+                    letterRendering: true
                 });
 
                 canvas.toBlob(async (blob) => {
@@ -547,7 +544,6 @@
                         return;
                     }
 
-                    // 비동기 클립보드 이미지 쓰기
                     if (navigator.clipboard && window.ClipboardItem) {
                         try {
                             await navigator.clipboard.write([
@@ -560,7 +556,6 @@
                         }
                     }
 
-                    // 모바일 등 미지원 브라우저용 자동 이미지 다운로드 폴백
                     const url = URL.createObjectURL(blob);
                     const a = document.createElement('a');
                     a.href = url;
@@ -581,7 +576,6 @@
             }
         }
 
-        // 3. 딥링크 접속 처리 (자동 이동 및 아코디언 오픈, 하이라이트)
         function checkDeepLink() {
             const hash = window.location.hash.replace('#', '').trim().toLowerCase();
             if (!hash || faqData.length === 0) return;
@@ -595,7 +589,6 @@
             if (targetIndex !== -1) {
                 const item = faqData[targetIndex];
                 
-                // 탭 전환
                 currentEdition = item.edition;
                 currentCategory = '전체';
                 document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
@@ -605,7 +598,6 @@
                 renderCategories();
                 renderFAQs();
 
-                // 아코디언 열기
                 const answer = document.getElementById(`answer-${targetIndex}`);
                 const icon = document.getElementById(`icon-${targetIndex}`);
                 if (answer && answer.classList.contains('hidden')) {
@@ -613,7 +605,6 @@
                     if (icon) icon.textContent = '−';
                 }
 
-                // 스크롤 및 하이라이트 애니메이션
                 setTimeout(() => {
                     const cardEl = document.getElementById(`faq-card-${targetIndex}`);
                     if (cardEl) {
@@ -703,18 +694,19 @@
                 <div class="faq-item rounded-xl overflow-hidden" id="faq-card-${index}">
                     <button onclick="toggleFAQ(${index})" class="w-full text-left p-5 flex justify-between items-center focus:outline-none cursor-pointer">
                         <div>
-                            <div class="flex gap-2 items-center mb-2">
-                                <span class="text-xs px-2 py-0.5 rounded-md font-semibold ${badgeColor}">${edLabel}</span>
-                                <span class="text-xs px-2.5 py-0.5 rounded-md bg-gray-800 text-gray-300 font-medium">${catLabel}</span>
+                            <!-- 태그 수직 중앙 정렬 보정 -->
+                            <div class="flex gap-2 items-center mb-2.5">
+                                <span class="inline-flex items-center justify-center text-xs px-2.5 py-1 rounded-md font-semibold leading-none ${badgeColor}">${edLabel}</span>
+                                <span class="inline-flex items-center justify-center text-xs px-2.5 py-1 rounded-md bg-gray-800 text-gray-300 font-medium leading-none">${catLabel}</span>
                             </div>
-                            <h3 class="text-lg font-semibold text-white">${displayQuestion}</h3>
+                            <h3 class="text-lg font-semibold text-white leading-snug">${displayQuestion}</h3>
                         </div>
                         <span id="icon-${index}" class="text-gray-400 text-xl ml-4 font-bold">+</span>
                     </button>
                     <div id="answer-${index}" class="hidden px-5 pb-5 pt-1 text-gray-300 border-t border-[#21262d] text-base leading-relaxed bg-[#0d1117]/40">
                         <div>${displayAnswer}</div>
                         
-                        <!-- 액션 툴바: 캡처 시 제외되도록 data-html2canvas-ignore 적용 -->
+                        <!-- 캡처 시 제외되는 액션 툴바 -->
                         <div class="mt-4 pt-3 border-t border-[#30363d]/60 flex flex-wrap items-center justify-between gap-2" data-html2canvas-ignore="true">
                             <div>
                                 ${currentLang === 'KO' && item.a_en && item.a_en !== item.a_ko ? `
