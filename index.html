@@ -16,8 +16,6 @@
 
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
-    <!-- HTML 카드 캡처 라이브러리 -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <style>
         body { background-color: #0d1117; color: #c9d1d9; font-family: system-ui, -apple-system, sans-serif; }
         .faq-item { background-color: #161b22; border: 1px solid #30363d; transition: all 0.2s ease; }
@@ -26,19 +24,6 @@
         .tab-btn.active, .lang-btn.active { background-color: #1f6beb; border-color: #388bfd; color: #ffffff; font-weight: 600; }
         .category-btn { background-color: #21262d; color: #8b949e; }
         .category-btn.active { background-color: #388bfd; color: #ffffff; }
-
-        /* 태그 전용 고정 높이/수직 중앙 정렬 클래스 */
-        .faq-badge {
-            display: inline-block;
-            height: 22px;
-            line-height: 21px;
-            padding: 0 8px;
-            font-size: 11px;
-            font-weight: 600;
-            border-radius: 6px;
-            box-sizing: border-box;
-            vertical-align: middle;
-        }
     </style>
 </head>
 <body class="min-h-screen py-10 px-4 sm:px-6 lg:px-8">
@@ -77,7 +62,7 @@
 
                 <!-- 공식 룰북 드롭다운 메뉴 -->
                 <div class="relative inline-block text-left" id="rulebookDropdownContainer">
-                    <button onclick="toggleRulebookDropdown(event)" class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-[#161b22] hover:bg-[#21262d] border border-[#30363d] hover:border-[#58a6ff] text-gray-200 hover:text-white transition-all shadow-sm cursor-pointer focus:outline-none">
+                    <button onclick="toggleRulebookDropdown(event)" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#161b22] hover:bg-[#21262d] border border-[#30363d] hover:border-[#58a6ff] text-gray-200 hover:text-white transition-all shadow-sm cursor-pointer focus:outline-none">
                         <span>📖</span>
                         <span id="rulebook-btn-text">공식 룰북</span>
                         <span class="text-[10px] text-gray-400">▼</span>
@@ -243,7 +228,6 @@
                 bggBase: "BGG 본판 FAQ 원본",
                 bggExp: "BGG 확장 FAQ 원본",
                 copyLink: "링크 복사",
-                copyImage: "이미지 복사",
                 noResult: "검색 조건에 맞는 FAQ가 없습니다.",
                 loading: "FAQ 데이터를 불러오는 중입니다...",
                 delayMsg: "데이터 로드가 지연되어 캐시를 삭제하고 자동 재시도합니다...",
@@ -263,7 +247,6 @@
                 bggBase: "BGG Base FAQ (Official)",
                 bggExp: "BGG Expansion FAQ (Official)",
                 copyLink: "Copy Link",
-                copyImage: "Copy Image",
                 noResult: "No FAQs match your search criteria.",
                 loading: "Loading FAQ data...",
                 delayMsg: "Loading delayed over 30s. Clearing cache and auto-retrying...",
@@ -518,100 +501,6 @@
             showToast(currentLang === 'KO' ? "🔗 해당 FAQ 공유 링크가 복사되었습니다!" : "🔗 FAQ link copied to clipboard!", "🔗");
         }
 
-        async function copyFaqAsImage(index, event) {
-            if (event) event.stopPropagation();
-            const card = document.getElementById(`faq-card-${index}`);
-            if (!card) return;
-
-            const answer = document.getElementById(`answer-${index}`);
-            const icon = document.getElementById(`icon-${index}`);
-            if (answer && answer.classList.contains('hidden')) {
-                answer.classList.remove('hidden');
-                if (icon) icon.textContent = '−';
-            }
-
-            const btn = document.getElementById(`btn-copy-img-${index}`);
-            const originalHtml = btn ? btn.innerHTML : '';
-            if (btn) {
-                btn.innerHTML = `<span>⏳</span><span>${currentLang === 'KO' ? '캡처 중...' : 'Capturing...'}</span>`;
-                btn.disabled = true;
-            }
-
-            try {
-                const canvas = await html2canvas(card, {
-                    backgroundColor: '#161b22',
-                    scale: 2,
-                    useCORS: true,
-                    logging: false,
-                    onclone: (clonedDoc) => {
-                        const targetCard = clonedDoc.getElementById(`faq-card-${index}`);
-                        if (targetCard) {
-                            targetCard.style.borderRadius = '16px';
-                            targetCard.style.overflow = 'hidden';
-                        }
-
-                        // 복제 DOM에서 태그의 패딩을 제거하고 정밀한 line-height로 수직 중앙을 물리적으로 고정
-                        const badges = clonedDoc.querySelectorAll(`#faq-card-${index} .faq-badge`);
-                        badges.forEach(b => {
-                            b.style.display = 'inline-block';
-                            b.style.height = '22px';
-                            b.style.lineHeight = '21px';
-                            b.style.paddingTop = '0px';
-                            b.style.paddingBottom = '0px';
-                            b.style.paddingLeft = '8px';
-                            b.style.paddingRight = '8px';
-                            b.style.boxSizing = 'border-box';
-                            b.style.verticalAlign = 'middle';
-                        });
-
-                        const toggleIcon = clonedDoc.getElementById(`icon-${index}`);
-                        if (toggleIcon) toggleIcon.style.display = 'none';
-                    }
-                });
-
-                canvas.toBlob(async (blob) => {
-                    if (btn) {
-                        btn.innerHTML = originalHtml;
-                        btn.disabled = false;
-                    }
-
-                    if (!blob) {
-                        showToast(currentLang === 'KO' ? "이미지 생성 실패" : "Failed to generate image", "❌");
-                        return;
-                    }
-
-                    if (navigator.clipboard && window.ClipboardItem) {
-                        try {
-                            await navigator.clipboard.write([
-                                new ClipboardItem({ 'image/png': blob })
-                            ]);
-                            showToast(currentLang === 'KO' ? "📷 이미지가 복사되었습니다! (Ctrl+V로 붙여넣기)" : "📷 Image copied! (Paste with Ctrl+V)", "📷");
-                            return;
-                        } catch (clipErr) {
-                            console.log('Clipboard write failed, downloading image...', clipErr);
-                        }
-                    }
-
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = `SETI_FAQ_${index + 1}.png`;
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                    URL.revokeObjectURL(url);
-                    showToast(currentLang === 'KO' ? "📷 이미지가 파일로 저장되었습니다!" : "📷 Image saved as file!", "💾");
-                }, 'image/png');
-            } catch (err) {
-                console.error('html2canvas error:', err);
-                if (btn) {
-                    btn.innerHTML = originalHtml;
-                    btn.disabled = false;
-                }
-                showToast(currentLang === 'KO' ? "이미지 캡처 중 오류가 발생했습니다." : "Error capturing image.", "❌");
-            }
-        }
-
         function checkDeepLink() {
             const hash = window.location.hash.replace('#', '').trim().toLowerCase();
             if (!hash || faqData.length === 0) return;
@@ -708,42 +597,40 @@
                 const slug = generateFaqSlug(item, item.id);
                 
                 const displayQuestion = currentLang === 'EN' ? (item.q_en || item.q_ko) : (item.q_ko || item.q_en);
-
-                let displayAnswer = '';
-                if (currentLang === 'EN') {
-                    displayAnswer = (item.a_en || item.a_ko).replace(/\n/g, '<br>');
-                } else {
-                    displayAnswer = item.a_ko.replace(/\n/g, '<br>');
-                    if (item.a_en && item.a_en !== item.a_ko) {
-                        displayAnswer += `
-                            <div class="mt-4 pt-3 border-t border-[#30363d]/60">
-                                <div id="en-box-${index}" class="hidden mb-3 p-4 rounded-xl bg-[#161b22] border border-[#30363d] text-xs sm:text-sm text-gray-300 leading-relaxed space-y-2">
-                                    <div class="font-bold text-gray-200 border-b border-[#30363d] pb-2">${item.q_en}</div>
-                                    <div>${item.a_en.replace(/\n/g, '<br>')}</div>
-                                </div>
-                            </div>
-                        `;
-                    }
-                }
+                const displayAnswer = currentLang === 'EN' ? (item.a_en || item.a_ko).replace(/\n/g, '<br>') : item.a_ko.replace(/\n/g, '<br>');
 
                 return `
-                <div class="faq-item rounded-xl overflow-hidden" id="faq-card-${index}">
+                <div class="faq-item rounded-2xl overflow-hidden" id="faq-card-${index}">
                     <button onclick="toggleFAQ(${index})" class="w-full text-left p-5 flex justify-between items-center focus:outline-none cursor-pointer">
                         <div>
-                            <!-- 태그 수직 중앙 정렬 클래스 적용 -->
                             <div class="flex gap-2 items-center mb-2.5">
-                                <span class="faq-badge ${badgeColor}">${edLabel}</span>
-                                <span class="faq-badge bg-gray-800 text-gray-300 border border-gray-700/40">${catLabel}</span>
+                                <span class="text-xs px-2.5 py-1 rounded-md font-semibold ${badgeColor}">${edLabel}</span>
+                                <span class="text-xs px-2.5 py-1 rounded-md bg-gray-800 text-gray-300 font-medium border border-gray-700/40">${catLabel}</span>
                             </div>
                             <h3 class="text-lg font-semibold text-white leading-snug">${displayQuestion}</h3>
                         </div>
                         <span id="icon-${index}" class="text-gray-400 text-xl ml-4 font-bold">+</span>
                     </button>
-                    <div id="answer-${index}" class="hidden px-5 pb-5 pt-1 text-gray-300 border-t border-[#21262d] text-base leading-relaxed bg-[#0d1117]/40">
-                        <div>${displayAnswer}</div>
-                        
-                        <!-- 캡처 시 제외되는 액션 툴바 -->
-                        <div class="mt-4 pt-3 border-t border-[#30363d]/60 flex flex-wrap items-center justify-between gap-2" data-html2canvas-ignore="true">
+
+                    <!-- 답변 펼침 영역 -->
+                    <div id="answer-${index}" class="hidden px-5 pb-5 pt-1 bg-[#0d1117]/50 border-t border-[#21262d]">
+                        <!-- 독립된 답변 블록 카드 -->
+                        <div class="p-4 rounded-xl bg-[#161b22] border border-[#30363d] text-sm text-gray-200 leading-relaxed shadow-inner">
+                            ${displayAnswer}
+                        </div>
+
+                        <!-- 영어 원문 보기 블록 (토글 시 노출) -->
+                        ${currentLang === 'KO' && item.a_en && item.a_en !== item.a_ko ? `
+                            <div id="en-box-${index}" class="hidden mt-3 p-4 rounded-xl bg-[#161b22] border border-blue-900/50 text-xs sm:text-sm text-gray-300 leading-relaxed space-y-2">
+                                <div class="font-bold text-blue-300 border-b border-[#30363d] pb-2 flex items-center gap-1.5">
+                                    <span>🇺🇸</span> <span>${item.q_en}</span>
+                                </div>
+                                <div>${item.a_en.replace(/\n/g, '<br>')}</div>
+                            </div>
+                        ` : ''}
+
+                        <!-- 하단 단일 액션 버튼 바 -->
+                        <div class="mt-3 flex flex-wrap items-center justify-between gap-2">
                             <div>
                                 ${currentLang === 'KO' && item.a_en && item.a_en !== item.a_ko ? `
                                     <button onclick="toggleEnOriginal(${index})" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#21262d] hover:bg-[#30363d] border border-[#30363d] hover:border-[#58a6ff] text-xs font-medium text-gray-200 hover:text-white transition-all shadow-sm focus:outline-none cursor-pointer">
@@ -752,14 +639,10 @@
                                     </button>
                                 ` : ''}
                             </div>
-                            <div class="flex items-center gap-2">
+                            <div>
                                 <button onclick="copyFaqLink('${slug}', event)" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#21262d] hover:bg-[#30363d] border border-[#30363d] hover:border-blue-500 text-xs font-medium text-gray-300 hover:text-white transition-all shadow-sm focus:outline-none cursor-pointer">
                                     <span>🔗</span>
                                     <span>${t.copyLink}</span>
-                                </button>
-                                <button onclick="copyFaqAsImage(${index}, event)" id="btn-copy-img-${index}" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#21262d] hover:bg-[#30363d] border border-[#30363d] hover:border-purple-500 text-xs font-medium text-gray-300 hover:text-white transition-all shadow-sm focus:outline-none cursor-pointer">
-                                    <span>📷</span>
-                                    <span>${t.copyImage}</span>
                                 </button>
                             </div>
                         </div>
