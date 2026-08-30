@@ -26,6 +26,19 @@
         .tab-btn.active, .lang-btn.active { background-color: #1f6beb; border-color: #388bfd; color: #ffffff; font-weight: 600; }
         .category-btn { background-color: #21262d; color: #8b949e; }
         .category-btn.active { background-color: #388bfd; color: #ffffff; }
+
+        /* 태그 전용 고정 높이/수직 중앙 정렬 클래스 */
+        .faq-badge {
+            display: inline-block;
+            height: 22px;
+            line-height: 21px;
+            padding: 0 8px;
+            font-size: 11px;
+            font-weight: 600;
+            border-radius: 6px;
+            box-sizing: border-box;
+            vertical-align: middle;
+        }
     </style>
 </head>
 <body class="min-h-screen py-10 px-4 sm:px-6 lg:px-8">
@@ -64,7 +77,7 @@
 
                 <!-- 공식 룰북 드롭다운 메뉴 -->
                 <div class="relative inline-block text-left" id="rulebookDropdownContainer">
-                    <button onclick="toggleRulebookDropdown(event)" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#161b22] hover:bg-[#21262d] border border-[#30363d] hover:border-[#58a6ff] text-gray-200 hover:text-white transition-all shadow-sm cursor-pointer focus:outline-none">
+                    <button onclick="toggleRulebookDropdown(event)" class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-[#161b22] hover:bg-[#21262d] border border-[#30363d] hover:border-[#58a6ff] text-gray-200 hover:text-white transition-all shadow-sm cursor-pointer focus:outline-none">
                         <span>📖</span>
                         <span id="rulebook-btn-text">공식 룰북</span>
                         <span class="text-[10px] text-gray-400">▼</span>
@@ -530,7 +543,30 @@
                     scale: 2,
                     useCORS: true,
                     logging: false,
-                    letterRendering: true
+                    onclone: (clonedDoc) => {
+                        const targetCard = clonedDoc.getElementById(`faq-card-${index}`);
+                        if (targetCard) {
+                            targetCard.style.borderRadius = '16px';
+                            targetCard.style.overflow = 'hidden';
+                        }
+
+                        // 복제 DOM에서 태그의 패딩을 제거하고 정밀한 line-height로 수직 중앙을 물리적으로 고정
+                        const badges = clonedDoc.querySelectorAll(`#faq-card-${index} .faq-badge`);
+                        badges.forEach(b => {
+                            b.style.display = 'inline-block';
+                            b.style.height = '22px';
+                            b.style.lineHeight = '21px';
+                            b.style.paddingTop = '0px';
+                            b.style.paddingBottom = '0px';
+                            b.style.paddingLeft = '8px';
+                            b.style.paddingRight = '8px';
+                            b.style.boxSizing = 'border-box';
+                            b.style.verticalAlign = 'middle';
+                        });
+
+                        const toggleIcon = clonedDoc.getElementById(`icon-${index}`);
+                        if (toggleIcon) toggleIcon.style.display = 'none';
+                    }
                 });
 
                 canvas.toBlob(async (blob) => {
@@ -694,10 +730,10 @@
                 <div class="faq-item rounded-xl overflow-hidden" id="faq-card-${index}">
                     <button onclick="toggleFAQ(${index})" class="w-full text-left p-5 flex justify-between items-center focus:outline-none cursor-pointer">
                         <div>
-                            <!-- 태그 수직 중앙 정렬 보정 -->
+                            <!-- 태그 수직 중앙 정렬 클래스 적용 -->
                             <div class="flex gap-2 items-center mb-2.5">
-                                <span class="inline-flex items-center justify-center text-xs px-2.5 py-1 rounded-md font-semibold leading-none ${badgeColor}">${edLabel}</span>
-                                <span class="inline-flex items-center justify-center text-xs px-2.5 py-1 rounded-md bg-gray-800 text-gray-300 font-medium leading-none">${catLabel}</span>
+                                <span class="faq-badge ${badgeColor}">${edLabel}</span>
+                                <span class="faq-badge bg-gray-800 text-gray-300 border border-gray-700/40">${catLabel}</span>
                             </div>
                             <h3 class="text-lg font-semibold text-white leading-snug">${displayQuestion}</h3>
                         </div>
