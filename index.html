@@ -16,6 +16,8 @@
 
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+    <!-- HTML 카드 캡처 라이브러리 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <style>
         body { background-color: #0d1117; color: #c9d1d9; font-family: system-ui, -apple-system, sans-serif; }
         .faq-item { background-color: #161b22; border: 1px solid #30363d; transition: all 0.2s ease; }
@@ -28,6 +30,12 @@
 </head>
 <body class="min-h-screen py-10 px-4 sm:px-6 lg:px-8">
     <div class="max-w-4xl mx-auto">
+        <!-- 상단 알림 토스트 -->
+        <div id="toast" class="hidden fixed top-6 left-1/2 transform -translate-x-1/2 bg-[#161b22]/95 border border-[#58a6ff] text-white px-5 py-3 rounded-2xl shadow-2xl z-50 text-sm font-medium transition-all flex items-center gap-2.5 backdrop-blur-md">
+            <span id="toast-icon">✨</span>
+            <span id="toast-msg">알림</span>
+        </div>
+
         <!-- 상단 네비게이션: 캐시 새로고침 버튼 (좌측) & 언어 선택 (우측) -->
         <div class="flex justify-between items-center mb-6">
             <button onclick="forceReload()" class="px-3.5 py-1.5 rounded-xl bg-[#161b22] hover:bg-[#21262d] border border-[#30363d] hover:border-[#58a6ff] text-xs sm:text-sm font-medium text-gray-300 hover:text-white transition-all inline-flex items-center gap-1.5 shadow-sm cursor-pointer">
@@ -45,9 +53,9 @@
             <h1 id="header-title" class="text-3xl sm:text-4xl font-bold text-white mb-2">🛸 SETI 보드게임 FAQ</h1>
             <p id="header-sub" class="text-gray-400 text-sm sm:text-base mb-4">규칙, 에라타 및 카드 검색 시스템</p>
             
-            <!-- 상단 도구 및 링크 버튼 영역 -->
+            <!-- 상단 외부 링크 및 드롭다운 버튼 영역 -->
             <div class="flex flex-wrap justify-center items-center gap-2.5 text-xs">
-                <!-- 외계종 발견 랜더마이저 페이지 이동 버튼 -->
+                <!-- 외계종 발견 랜더마이저 버튼 -->
                 <a href="./randomizer.html" class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-gradient-to-r from-blue-900/60 to-purple-900/60 hover:from-blue-800/80 hover:to-purple-800/80 border border-blue-500/50 hover:border-blue-400 text-white font-semibold transition-all shadow-md">
                     <span>👾</span>
                     <span id="link-alien-randomizer">외계종 발견 랜더마이저</span>
@@ -205,6 +213,7 @@
         
         let loadTimer = null;
         let isLoaded = false;
+        let toastTimer = null;
 
         const i18n = {
             KO: {
@@ -220,6 +229,8 @@
                 randomizer: "태양계 랜더마이저",
                 bggBase: "BGG 본판 FAQ 원본",
                 bggExp: "BGG 확장 FAQ 원본",
+                copyLink: "링크 복사",
+                copyImage: "이미지 복사",
                 noResult: "검색 조건에 맞는 FAQ가 없습니다.",
                 loading: "FAQ 데이터를 불러오는 중입니다...",
                 delayMsg: "데이터 로드가 지연되어 캐시를 삭제하고 자동 재시도합니다...",
@@ -238,12 +249,23 @@
                 randomizer: "Solar System Randomizer",
                 bggBase: "BGG Base FAQ (Official)",
                 bggExp: "BGG Expansion FAQ (Official)",
+                copyLink: "Copy Link",
+                copyImage: "Copy Image",
                 noResult: "No FAQs match your search criteria.",
                 loading: "Loading FAQ data...",
                 delayMsg: "Loading delayed over 30s. Clearing cache and auto-retrying...",
                 reloadBtn: "Force Reload Now"
             }
         };
+
+        function showToast(msg, icon = '✨') {
+            const toast = document.getElementById('toast');
+            document.getElementById('toast-icon').textContent = icon;
+            document.getElementById('toast-msg').textContent = msg;
+            toast.classList.remove('hidden');
+            clearTimeout(toastTimer);
+            toastTimer = setTimeout(() => toast.classList.add('hidden'), 2800);
+        }
 
         function updateRulebookDropdown(lang) {
             const data = rulebookLinks[lang];
@@ -344,7 +366,7 @@
                 header: true,
                 skipEmptyLines: true,
                 complete: function(results) {
-                    const parsed = results.data.map(item => {
+                    const parsed = results.data.map((item, idx) => {
                         const cat_ko = item['카테고리 (KO)'] ? item['카테고리 (KO)'].trim() : (item['카테고리'] ? item['카테고리'].trim() : '기타');
                         const cat_en = item['카테고리 (EN)'] ? item['카테고리 (EN)'].trim() : (categoryMap[cat_ko] || cat_ko);
                         
@@ -359,6 +381,7 @@
                         const a_en = item['답변 (EN)'] ? item['답변 (EN)'].trim() : a_ko;
 
                         return {
+                            id: idx,
                             edition: ed,
                             cat_ko: cat_ko,
                             cat_en: cat_en,
@@ -375,6 +398,7 @@
                         faqData = parsed;
                         
                         setLanguage(currentLang);
+                        checkDeepLink();
                     } else if (!isFallback) {
                         loadCSV(GVIZ_URL, true);
                     } else {
@@ -450,9 +474,163 @@
             }
         }
 
+        // 고유 식별자(Slug) 생성
+        function generateFaqSlug(item, index) {
+            const match = item.q_ko.match(/#([a-zA-Z0-9.\s]+)/);
+            if (match) {
+                return 'card-' + match[1].trim().toLowerCase().replace(/\s+/g, '-').replace(/\./g, '-');
+            }
+            return 'faq-' + (index + 1);
+        }
+
+        // 1. 딥링크 복사 기능
+        function copyFaqLink(slug, event) {
+            if (event) event.stopPropagation();
+            const url = `${window.location.origin}${window.location.pathname}#${slug}`;
+            
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(url).then(() => {
+                    showToast(currentLang === 'KO' ? "🔗 해당 FAQ 공유 링크가 복사되었습니다!" : "🔗 FAQ link copied to clipboard!", "🔗");
+                }).catch(() => fallbackCopyText(url));
+            } else {
+                fallbackCopyText(url);
+            }
+        }
+
+        function fallbackCopyText(text) {
+            const input = document.createElement('input');
+            input.value = text;
+            document.body.appendChild(input);
+            input.select();
+            document.execCommand('copy');
+            document.body.removeChild(input);
+            showToast(currentLang === 'KO' ? "🔗 해당 FAQ 공유 링크가 복사되었습니다!" : "🔗 FAQ link copied to clipboard!", "🔗");
+        }
+
+        // 2. 이미지 클립보드 복사 기능 (html2canvas 활용)
+        async function copyFaqAsImage(index, event) {
+            if (event) event.stopPropagation();
+            const card = document.getElementById(`faq-card-${index}`);
+            if (!card) return;
+
+            // 답변이 닫혀있다면 먼저 펼침
+            const answer = document.getElementById(`answer-${index}`);
+            const icon = document.getElementById(`icon-${index}`);
+            if (answer && answer.classList.contains('hidden')) {
+                answer.classList.remove('hidden');
+                if (icon) icon.textContent = '−';
+            }
+
+            const btn = document.getElementById(`btn-copy-img-${index}`);
+            const originalHtml = btn ? btn.innerHTML : '';
+            if (btn) {
+                btn.innerHTML = `<span>⏳</span><span>${currentLang === 'KO' ? '캡처 중...' : 'Capturing...'}</span>`;
+                btn.disabled = true;
+            }
+
+            try {
+                const canvas = await html2canvas(card, {
+                    backgroundColor: '#161b22',
+                    scale: 2,
+                    useCORS: true,
+                    logging: false
+                });
+
+                canvas.toBlob(async (blob) => {
+                    if (btn) {
+                        btn.innerHTML = originalHtml;
+                        btn.disabled = false;
+                    }
+
+                    if (!blob) {
+                        showToast(currentLang === 'KO' ? "이미지 생성 실패" : "Failed to generate image", "❌");
+                        return;
+                    }
+
+                    // 비동기 클립보드 이미지 쓰기
+                    if (navigator.clipboard && window.ClipboardItem) {
+                        try {
+                            await navigator.clipboard.write([
+                                new ClipboardItem({ 'image/png': blob })
+                            ]);
+                            showToast(currentLang === 'KO' ? "📷 이미지가 복사되었습니다! (Ctrl+V로 붙여넣기)" : "📷 Image copied! (Paste with Ctrl+V)", "📷");
+                            return;
+                        } catch (clipErr) {
+                            console.log('Clipboard write failed, downloading image...', clipErr);
+                        }
+                    }
+
+                    // 모바일 등 미지원 브라우저용 자동 이미지 다운로드 폴백
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `SETI_FAQ_${index + 1}.png`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                    showToast(currentLang === 'KO' ? "📷 이미지가 파일로 저장되었습니다!" : "📷 Image saved as file!", "💾");
+                }, 'image/png');
+            } catch (err) {
+                console.error('html2canvas error:', err);
+                if (btn) {
+                    btn.innerHTML = originalHtml;
+                    btn.disabled = false;
+                }
+                showToast(currentLang === 'KO' ? "이미지 캡처 중 오류가 발생했습니다." : "Error capturing image.", "❌");
+            }
+        }
+
+        // 3. 딥링크 접속 처리 (자동 이동 및 아코디언 오픈, 하이라이트)
+        function checkDeepLink() {
+            const hash = window.location.hash.replace('#', '').trim().toLowerCase();
+            if (!hash || faqData.length === 0) return;
+
+            const targetIndex = faqData.findIndex((item, idx) => {
+                const slug = generateFaqSlug(item, idx);
+                const cleanHash = hash.replace(/^card-/, '');
+                return slug === hash || slug === 'card-' + hash || slug === ('card-' + cleanHash) || slug === ('faq-' + hash);
+            });
+
+            if (targetIndex !== -1) {
+                const item = faqData[targetIndex];
+                
+                // 탭 전환
+                currentEdition = item.edition;
+                currentCategory = '전체';
+                document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+                const activeTab = document.getElementById(`tab-${currentEdition}`);
+                if (activeTab) activeTab.classList.add('active');
+
+                renderCategories();
+                renderFAQs();
+
+                // 아코디언 열기
+                const answer = document.getElementById(`answer-${targetIndex}`);
+                const icon = document.getElementById(`icon-${targetIndex}`);
+                if (answer && answer.classList.contains('hidden')) {
+                    answer.classList.remove('hidden');
+                    if (icon) icon.textContent = '−';
+                }
+
+                // 스크롤 및 하이라이트 애니메이션
+                setTimeout(() => {
+                    const cardEl = document.getElementById(`faq-card-${targetIndex}`);
+                    if (cardEl) {
+                        cardEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        cardEl.classList.add('ring-2', 'ring-blue-500', 'shadow-[0_0_25px_rgba(59,130,246,0.6)]');
+                        setTimeout(() => {
+                            cardEl.classList.remove('ring-2', 'ring-blue-500', 'shadow-[0_0_25px_rgba(59,130,246,0.6)]');
+                        }, 3000);
+                    }
+                }, 300);
+            }
+        }
+
         function renderFAQs() {
             const rawQuery = document.getElementById('searchInput').value.toLowerCase().trim();
             const listContainer = document.getElementById('faqList');
+            const t = i18n[currentLang];
             
             const filtered = faqData.filter(item => {
                 const matchesEdition = currentEdition === '전체' || item.edition === currentEdition;
@@ -489,7 +667,7 @@
             });
 
             if (filtered.length === 0) {
-                listContainer.innerHTML = `<div class="text-center py-12 text-gray-500">${i18n[currentLang].noResult}</div>`;
+                listContainer.innerHTML = `<div class="text-center py-12 text-gray-500">${t.noResult}</div>`;
                 return;
             }
 
@@ -500,6 +678,7 @@
                 
                 const edLabel = currentLang === 'EN' ? (item.edition === '확장' ? 'Expansion' : 'Base') : item.edition;
                 const catLabel = currentLang === 'EN' ? item.cat_en : item.cat_ko;
+                const slug = generateFaqSlug(item, item.id);
                 
                 const displayQuestion = currentLang === 'EN' ? (item.q_en || item.q_ko) : (item.q_ko || item.q_en);
 
@@ -511,11 +690,7 @@
                     if (item.a_en && item.a_en !== item.a_ko) {
                         displayAnswer += `
                             <div class="mt-4 pt-3 border-t border-[#30363d]/60">
-                                <button onclick="toggleEnOriginal(${index})" class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-[#21262d] hover:bg-[#30363d] border border-[#30363d] hover:border-[#58a6ff] text-xs font-medium text-gray-200 hover:text-white transition-all shadow-sm focus:outline-none cursor-pointer">
-                                    <span>🇺🇸</span>
-                                    <span>영어 원문 보기</span>
-                                </button>
-                                <div id="en-box-${index}" class="hidden mt-3 p-4 rounded-xl bg-[#161b22] border border-[#30363d] text-xs sm:text-sm text-gray-300 leading-relaxed space-y-2">
+                                <div id="en-box-${index}" class="hidden mb-3 p-4 rounded-xl bg-[#161b22] border border-[#30363d] text-xs sm:text-sm text-gray-300 leading-relaxed space-y-2">
                                     <div class="font-bold text-gray-200 border-b border-[#30363d] pb-2">${item.q_en}</div>
                                     <div>${item.a_en.replace(/\n/g, '<br>')}</div>
                                 </div>
@@ -525,8 +700,8 @@
                 }
 
                 return `
-                <div class="faq-item rounded-xl overflow-hidden">
-                    <button onclick="toggleFAQ(${index})" class="w-full text-left p-5 flex justify-between items-center focus:outline-none">
+                <div class="faq-item rounded-xl overflow-hidden" id="faq-card-${index}">
+                    <button onclick="toggleFAQ(${index})" class="w-full text-left p-5 flex justify-between items-center focus:outline-none cursor-pointer">
                         <div>
                             <div class="flex gap-2 items-center mb-2">
                                 <span class="text-xs px-2 py-0.5 rounded-md font-semibold ${badgeColor}">${edLabel}</span>
@@ -537,7 +712,29 @@
                         <span id="icon-${index}" class="text-gray-400 text-xl ml-4 font-bold">+</span>
                     </button>
                     <div id="answer-${index}" class="hidden px-5 pb-5 pt-1 text-gray-300 border-t border-[#21262d] text-base leading-relaxed bg-[#0d1117]/40">
-                        ${displayAnswer}
+                        <div>${displayAnswer}</div>
+                        
+                        <!-- 액션 툴바: 캡처 시 제외되도록 data-html2canvas-ignore 적용 -->
+                        <div class="mt-4 pt-3 border-t border-[#30363d]/60 flex flex-wrap items-center justify-between gap-2" data-html2canvas-ignore="true">
+                            <div>
+                                ${currentLang === 'KO' && item.a_en && item.a_en !== item.a_ko ? `
+                                    <button onclick="toggleEnOriginal(${index})" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#21262d] hover:bg-[#30363d] border border-[#30363d] hover:border-[#58a6ff] text-xs font-medium text-gray-200 hover:text-white transition-all shadow-sm focus:outline-none cursor-pointer">
+                                        <span>🇺🇸</span>
+                                        <span>영어 원문 보기</span>
+                                    </button>
+                                ` : ''}
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <button onclick="copyFaqLink('${slug}', event)" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#21262d] hover:bg-[#30363d] border border-[#30363d] hover:border-blue-500 text-xs font-medium text-gray-300 hover:text-white transition-all shadow-sm focus:outline-none cursor-pointer">
+                                    <span>🔗</span>
+                                    <span>${t.copyLink}</span>
+                                </button>
+                                <button onclick="copyFaqAsImage(${index}, event)" id="btn-copy-img-${index}" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#21262d] hover:bg-[#30363d] border border-[#30363d] hover:border-purple-500 text-xs font-medium text-gray-300 hover:text-white transition-all shadow-sm focus:outline-none cursor-pointer">
+                                    <span>📷</span>
+                                    <span>${t.copyImage}</span>
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 `;
