@@ -1,11 +1,12 @@
-const CACHE_NAME = 'seti-faq-v2';
+const CACHE_NAME = 'seti-faq-v3';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
   './randomizer.html',
   './manifest.json',
   'https://cdn.tailwindcss.com',
-  'https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js'
+  'https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js',
+  'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js'
 ];
 
 self.addEventListener('install', (event) => {
