@@ -1,21 +1,20 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-    <!-- Google tag (gtag.js) -->
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SETI 외계종 발견 랜더마이저 / Alien Discovery Randomizer</title>
+    
+    <!-- Google tag (gtag.js) - GA4 트래픽 및 맞춤 이벤트 추적 -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-D8WD3NKS7N"></script>
     <script>
       window.dataLayer = window.dataLayer || [];
       function gtag(){dataLayer.push(arguments);}
       gtag('js', new Date());
-    
+
       gtag('config', 'G-D8WD3NKS7N');
     </script>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SETI 외계종 발견 랜더마이저 / Alien Discovery Randomizer</title>
-    
+
     <!-- PWA 메타 태그 -->
     <link rel="manifest" href="./manifest.json">
     <meta name="theme-color" content="#0d1117">
@@ -160,11 +159,9 @@
 
             <!-- 룰렛 영역 (상단 화살표 포함) -->
             <div class="relative w-[280px] sm:w-[320px] h-[280px] sm:h-[320px] mx-auto my-4 flex items-center justify-center">
-                <!-- 상단 화살표 (12시 방향) -->
                 <div class="absolute -top-3 left-1/2 transform -translate-x-1/2 z-20">
                     <div class="w-0 h-0 border-l-[12px] border-l-transparent border-r-[12px] border-r-transparent border-t-[20px] border-t-amber-400 drop-shadow-[0_4px_6px_rgba(251,191,36,0.8)]"></div>
                 </div>
-                <!-- 캔버스 돌림판 -->
                 <canvas id="wheelCanvas" width="600" height="600" class="w-full h-full rounded-full shadow-2xl border-4 border-[#30363d]"></canvas>
             </div>
 
@@ -184,7 +181,13 @@
             });
         }
 
-        // 외계종 마스터 데이터베이스 (지정 고유 색상 적용)
+        // GA4 맞춤 이벤트 전송 헬퍼 함수
+        function trackEvent(eventName, params = {}) {
+            if (typeof gtag === 'function') {
+                gtag('event', eventName, params);
+            }
+        }
+
         const ALIEN_SPECIES = [
             // 본판 (5종)
             { id: 'mascamites', ko: '마스카마이트', en: 'MASCAMITES', exp: false, color: '#a28817' },
@@ -342,6 +345,12 @@
             appState.leftWinner = null;
             appState.rightWinner = null;
             goToStep('ban');
+
+            // GA4 이벤트: 게임 모드 선택 추적 (본판만 vs 본판+확장)
+            trackEvent('randomizer_select_mode', {
+                game_mode: mode,
+                game_mode_label: mode === 'EXP' ? '본판+확장' : '본판만'
+            });
         }
 
         function goToStep(step) {
@@ -373,9 +382,20 @@
 
         function confirmBanSelection() {
             goToStep('slots');
+
+            // GA4 이벤트: 밴 설정 완료 추적
+            trackEvent('randomizer_confirm_ban', {
+                game_mode: appState.mode,
+                banned_count: appState.banned.length,
+                banned_list: appState.banned.join(',')
+            });
         }
 
         function resetAll() {
+            trackEvent('randomizer_reset', {
+                previous_mode: appState.mode
+            });
+
             appState = {
                 step: 'mode',
                 mode: null,
@@ -416,7 +436,7 @@
         function renderSlots() {
             const t = i18n[currentLang];
 
-            // 왼쪽 슬롯 렌더링
+            // 왼쪽 슬롯
             const leftResult = document.getElementById('left-result');
             const btnSpinLeft = document.getElementById('btn-spin-left');
             if (appState.leftWinner) {
@@ -437,7 +457,7 @@
                 btnSpinLeft.classList.remove('hidden');
             }
 
-            // 오른쪽 슬롯 렌더링
+            // 오른쪽 슬롯
             const rightResult = document.getElementById('right-result');
             const btnSpinRight = document.getElementById('btn-spin-right');
             if (appState.rightWinner) {
@@ -468,9 +488,7 @@
             if (appState.step === 'slots') renderSlots();
         }
 
-        // ==========================================
-        // 원형 돌림판 (Canvas 룰렛) 추첨 엔진
-        // ==========================================
+        // 룰렛 돌림판 엔진
         let currentSlotTarget = null;
         let wheelCandidates = [];
         let currentRotation = 0;
@@ -595,6 +613,17 @@
                 }
                 saveState();
 
+                // GA4 맞춤 이벤트: 외계종 당첨 추적
+                trackEvent('randomizer_alien_discovered', {
+                    slot_position: currentSlotTarget,
+                    slot_label: currentSlotTarget === 'LEFT' ? '왼쪽 외계종' : '오른쪽 외계종',
+                    alien_name_ko: winner.ko,
+                    alien_name_en: winner.en,
+                    alien_id: winner.id,
+                    game_mode: appState.mode,
+                    is_expansion: winner.exp ? '확장 외계종' : '본판 외계종'
+                });
+
                 setTimeout(() => {
                     closeWheelModal();
                     renderSlots();
@@ -626,7 +655,6 @@
                 const angleStart = i * sliceAngle;
                 const angleEnd = (i + 1) * sliceAngle;
 
-                // 고유색 부채꼴 섹터 렌더링
                 ctx.beginPath();
                 ctx.moveTo(0, 0);
                 ctx.arc(0, 0, radius, angleStart, angleEnd);
@@ -638,7 +666,6 @@
                 ctx.lineWidth = 6;
                 ctx.stroke();
 
-                // 외계종 텍스트 렌더링
                 ctx.save();
                 ctx.rotate(angleStart + sliceAngle / 2);
                 ctx.textAlign = 'right';
@@ -652,7 +679,6 @@
                 ctx.restore();
             }
 
-            // 중앙 원형 허브
             ctx.beginPath();
             ctx.arc(0, 0, 36, 0, Math.PI * 2);
             ctx.fillStyle = '#0d1117';
@@ -664,7 +690,6 @@
             ctx.restore();
         }
 
-        // 초기 실행
         loadState();
         setLanguage(currentLang);
     </script>

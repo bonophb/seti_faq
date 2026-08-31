@@ -1,19 +1,20 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-    <!-- Google tag (gtag.js) -->
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SETI 보드게임 FAQ / SETI Board Game FAQ</title>
+    
+    <!-- Google tag (gtag.js) - GA4 트래픽 및 맞춤 이벤트 추적 -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-D8WD3NKS7N"></script>
     <script>
       window.dataLayer = window.dataLayer || [];
       function gtag(){dataLayer.push(arguments);}
       gtag('js', new Date());
-    
+
       gtag('config', 'G-D8WD3NKS7N');
     </script>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SETI 보드게임 FAQ / SETI Board Game FAQ</title>
-    
+
     <!-- PWA 메타 태그 및 매니페스트 등록 -->
     <link rel="manifest" href="./manifest.json">
     <meta name="theme-color" content="#0d1117">
@@ -71,7 +72,7 @@
 
                 <!-- 공식 룰북 드롭다운 메뉴 -->
                 <div class="relative inline-block text-left" id="rulebookDropdownContainer">
-                    <button onclick="toggleRulebookDropdown(event)" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#161b22] hover:bg-[#21262d] border border-[#30363d] hover:border-[#58a6ff] text-gray-200 hover:text-white transition-all shadow-sm cursor-pointer focus:outline-none">
+                    <button onclick="toggleRulebookDropdown(event)" class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-[#161b22] hover:bg-[#21262d] border border-[#30363d] hover:border-[#58a6ff] text-gray-200 hover:text-white transition-all shadow-sm cursor-pointer focus:outline-none">
                         <span>📖</span>
                         <span id="rulebook-btn-text">공식 룰북</span>
                         <span class="text-[10px] text-gray-400">▼</span>
@@ -164,6 +165,13 @@
             });
         }
 
+        // GA4 맞춤 이벤트 전송 함수
+        function trackEvent(eventName, params = {}) {
+            if (typeof gtag === 'function') {
+                gtag('event', eventName, params);
+            }
+        }
+
         const SHEET_ID = '1H8VjQ4cSiOKzghHHUsna8KWBzVYm-YB-GPgj_haSr88';
         const PUBLISHED_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQYjGO3WyNoP4Pg3AJ8neCz4GYD1o9wVOjWnxvyIGpmImV3KnERKDG3Q_1_TdtQxWGwC22E8CbM6SWf/pub?output=csv';
         const GVIZ_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv`;
@@ -221,6 +229,7 @@
         let loadTimer = null;
         let isLoaded = false;
         let toastTimer = null;
+        let searchDebounceTimer = null;
 
         const i18n = {
             KO: {
@@ -476,10 +485,20 @@
             const box = document.getElementById(`en-box-${id}`);
             if (box) {
                 box.classList.toggle('hidden');
+                
+                if (!box.classList.contains('hidden')) {
+                    const item = faqData.find(d => d.id === id);
+                    if (item) {
+                        trackEvent('view_en_original', {
+                            faq_title: item.q_ko,
+                            faq_category: item.cat_ko
+                        });
+                    }
+                }
             }
         }
 
-        // 완벽한 고유 식별자(Slug) 생성 엔진
+        // 고유 Slug 생성 엔진 (충돌 방지 정밀 매핑)
         function generateFaqSlug(item, index) {
             const isExp = item.edition === '확장' || (item.cat_ko && item.cat_ko.includes('확장'));
             const str = ((item.q_en || '') + ' ' + (item.q_ko || '')).trim();
@@ -503,7 +522,7 @@
                 }
             }
 
-            // 3. 우주 기관 (#1 ~ #11) -> org-1 ~ org-11 최우선 매핑
+            // 3. 우주 기관 (#1 ~ #11) -> org-1 ~ org-11
             if (catKo.includes('기관') || catEn.includes('organization') || catEn.includes('agency') || catKo.includes('기구') || /#\d+\s*(orbital|fenwick|stratus|deep sky|turing|cosmos|sentinel|mission relay|xenolab|futurespan|helion)/i.test(str)) {
                 const orgMatch = str.match(/#0*(\d+)/);
                 if (orgMatch) {
@@ -531,7 +550,7 @@
             return `faq-${item.id !== undefined ? item.id + 1 : index + 1}`;
         }
 
-        function copyFaqLink(slug, event) {
+        function copyFaqLink(slug, event, id) {
             if (event) event.stopPropagation();
             const url = `${window.location.origin}${window.location.pathname}#${slug}`;
             
@@ -542,6 +561,13 @@
             } else {
                 fallbackCopyText(url);
             }
+
+            const item = faqData.find(d => d.id === id);
+            trackEvent('faq_share', {
+                faq_slug: slug,
+                faq_title: item ? item.q_ko : slug,
+                faq_edition: item ? item.edition : ''
+            });
         }
 
         function fallbackCopyText(text) {
@@ -554,14 +580,12 @@
             showToast(currentLang === 'KO' ? "🔗 해당 FAQ 공유 링크가 복사되었습니다!" : "🔗 FAQ link copied to clipboard!", "🔗");
         }
 
-        // 지능형 딥링크 추적 엔진
         function checkDeepLink() {
             const rawHash = window.location.hash.replace('#', '').trim().toLowerCase();
             if (!rawHash || faqData.length === 0) return;
 
             let targetItem = null;
 
-            // 1단계: 정확한 고유 Slug 매칭
             for (let i = 0; i < faqData.length; i++) {
                 const item = faqData[i];
                 const slug = generateFaqSlug(item, i);
@@ -571,7 +595,6 @@
                 }
             }
 
-            // 2단계: 유연한 접두사 호환성 매칭
             if (!targetItem) {
                 for (let i = 0; i < faqData.length; i++) {
                     const item = faqData[i];
@@ -593,7 +616,6 @@
             }
 
             if (targetItem) {
-                // 본판/확장 탭 자동 전환
                 currentEdition = targetItem.edition;
                 currentCategory = '전체';
                 document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
@@ -603,7 +625,6 @@
                 renderCategories();
                 renderFAQs();
 
-                // 고유 ID 기반 아코디언 열기
                 const targetId = targetItem.id;
                 const answer = document.getElementById(`answer-${targetId}`);
                 const icon = document.getElementById(`icon-${targetId}`);
@@ -612,7 +633,6 @@
                     if (icon) icon.textContent = '−';
                 }
 
-                // 부드러운 스크롤 & 파란색 하이라이트 애니메이션
                 setTimeout(() => {
                     const cardEl = document.getElementById(`faq-card-${targetId}`);
                     if (cardEl) {
@@ -725,7 +745,7 @@
                                 ` : ''}
                             </div>
                             <div>
-                                <button onclick="copyFaqLink('${slug}', event)" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#21262d] hover:bg-[#30363d] border border-[#30363d] hover:border-blue-500 text-xs font-medium text-gray-300 hover:text-white transition-all shadow-sm focus:outline-none cursor-pointer">
+                                <button onclick="copyFaqLink('${slug}', event, ${item.id})" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#21262d] hover:bg-[#30363d] border border-[#30363d] hover:border-blue-500 text-xs font-medium text-gray-300 hover:text-white transition-all shadow-sm focus:outline-none cursor-pointer">
                                     <span>🔗</span>
                                     <span>${t.copyLink}</span>
                                 </button>
@@ -741,16 +761,41 @@
             const answer = document.getElementById(`answer-${id}`);
             const icon = document.getElementById(`icon-${id}`);
             
-            if (answer && answer.classList.contains('hidden')) {
-                answer.classList.remove('hidden');
-                if (icon) icon.textContent = '−';
-            } else if (answer) {
-                answer.classList.add('hidden');
-                if (icon) icon.textContent = '+';
+            if (answer) {
+                if (answer.classList.contains('hidden')) {
+                    answer.classList.remove('hidden');
+                    if (icon) icon.textContent = '−';
+
+                    const item = faqData.find(d => d.id === id);
+                    if (item) {
+                        trackEvent('faq_open', {
+                            faq_title: item.q_ko,
+                            faq_category: item.cat_ko,
+                            faq_edition: item.edition,
+                            language: currentLang
+                        });
+                    }
+                } else {
+                    answer.classList.add('hidden');
+                    if (icon) icon.textContent = '+';
+                }
             }
         }
 
-        document.getElementById('searchInput').addEventListener('input', renderFAQs);
+        document.getElementById('searchInput').addEventListener('input', () => {
+            renderFAQs();
+
+            const query = document.getElementById('searchInput').value.trim();
+            clearTimeout(searchDebounceTimer);
+            if (query.length >= 2) {
+                searchDebounceTimer = setTimeout(() => {
+                    trackEvent('search', {
+                        search_term: query
+                    });
+                }, 800);
+            }
+        });
+
         loadCSV(PUBLISHED_URL);
     </script>
 </body>
