@@ -25,10 +25,13 @@
         .glass-card { background-color: #161b22; border: 1px solid #30363d; }
         .alien-card { transition: all 0.2s ease; }
         .alien-card:hover { transform: translateY(-2px); }
+        button:focus-visible, a:focus-visible, input:focus-visible, [tabindex]:focus-visible {
+            outline: 3px solid #58a6ff !important; outline-offset: 3px;
+        }
     </style>
 </head>
 <body class="min-h-screen py-8 px-4 sm:px-6 lg:px-8">
-    <div class="max-w-3xl mx-auto">
+    <div id="page-content" class="max-w-3xl mx-auto">
         <!-- 상단 네비게이션 -->
         <div class="flex justify-between items-center mb-6">
             <div class="flex items-center gap-2">
@@ -56,7 +59,7 @@
         </header>
 
         <!-- 경고 알림 토스트 (최소 2종 제한 경고) -->
-        <div id="toast" class="hidden fixed top-6 left-1/2 transform -translate-x-1/2 bg-red-900/90 border border-red-500 text-white px-5 py-3 rounded-xl shadow-2xl z-50 text-sm font-medium transition-all flex items-center gap-2">
+        <div id="toast" role="status" aria-live="polite" class="hidden fixed top-6 left-1/2 transform -translate-x-1/2 bg-red-900/90 border border-red-500 text-white px-5 py-3 rounded-xl shadow-2xl z-50 text-sm font-medium transition-all flex items-center gap-2">
             <span>⚠️</span>
             <span id="toast-msg">최소 2개의 외계종은 남아있어야 합니다.</span>
         </div>
@@ -64,7 +67,7 @@
         <!-- STEP 1: 게임 모드 선택 -->
         <div id="step-mode" class="space-y-6">
             <div class="text-center mb-4">
-                <h2 id="title-step1" class="text-xl font-semibold text-white">1단계: 게임 모드를 선택하세요</h2>
+                <h2 id="title-step1" tabindex="-1" class="text-xl font-semibold text-white">1단계: 게임 모드를 선택하세요</h2>
                 <p id="desc-step1" class="text-xs text-gray-400 mt-1">플레이할 게임 버전에 따라 외계종 풀이 결정됩니다.</p>
             </div>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -84,7 +87,7 @@
         <!-- STEP 2: 외계종 밴(제외) 설정 -->
         <div id="step-ban" class="hidden space-y-6">
             <div class="text-center mb-2">
-                <h2 id="title-step2" class="text-xl font-semibold text-white">2단계: 제외(밴)할 외계종 선택</h2>
+                <h2 id="title-step2" tabindex="-1" class="text-xl font-semibold text-white">2단계: 제외(밴)할 외계종 선택</h2>
                 <p id="desc-step2" class="text-xs text-gray-400 mt-1">제외할 외계종을 클릭하여 비활성화하세요. (최소 2종 필수 잔여)</p>
             </div>
 
@@ -104,7 +107,7 @@
         <!-- STEP 3: 좌/우 외계종 슬롯 및 추첨 진행 -->
         <div id="step-slots" class="hidden space-y-6">
             <div class="text-center mb-2">
-                <h2 id="title-step3" class="text-xl font-semibold text-white">3단계: 왼쪽 및 오른쪽 외계종 발견 추첨</h2>
+                <h2 id="title-step3" tabindex="-1" class="text-xl font-semibold text-white">3단계: 왼쪽 및 오른쪽 외계종 발견 추첨</h2>
                 <p id="desc-step3" class="text-xs text-gray-400 mt-1">각 슬롯의 버튼을 눌러 돌림판으로 외계종을 무작위 추첨하세요.</p>
             </div>
 
@@ -113,7 +116,7 @@
                 <div id="slot-left" class="glass-card p-6 rounded-2xl text-center flex flex-col justify-between min-h-[230px] transition-all">
                     <div>
                         <span class="text-xs font-semibold px-2.5 py-1 rounded-md bg-blue-900/50 text-blue-300 border border-blue-700/50" id="label-left-slot">왼쪽 외계종</span>
-                        <div id="left-result" class="my-5">
+                        <div id="left-result" role="status" aria-live="polite" class="my-5">
                             <span class="text-gray-500 text-sm" id="text-left-empty">미선택 상태</span>
                         </div>
                     </div>
@@ -126,7 +129,7 @@
                 <div id="slot-right" class="glass-card p-6 rounded-2xl text-center flex flex-col justify-between min-h-[230px] transition-all">
                     <div>
                         <span class="text-xs font-semibold px-2.5 py-1 rounded-md bg-purple-900/50 text-purple-300 border border-purple-700/50" id="label-right-slot">오른쪽 외계종</span>
-                        <div id="right-result" class="my-5">
+                        <div id="right-result" role="status" aria-live="polite" class="my-5">
                             <span class="text-gray-500 text-sm" id="text-right-empty">미선택 상태</span>
                         </div>
                     </div>
@@ -145,9 +148,9 @@
     </div>
 
     <!-- 룰렛 돌림판 모달 팝업 -->
-    <div id="wheelModal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+    <div id="wheelModal" role="dialog" aria-modal="true" aria-labelledby="wheel-modal-title" tabindex="-1" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
         <div class="glass-card max-w-md w-full p-6 rounded-3xl text-center relative border border-[#30363d] shadow-2xl">
-            <button onclick="closeWheelModal()" class="absolute top-4 right-4 text-gray-400 hover:text-white text-xl font-bold focus:outline-none cursor-pointer">✕</button>
+            <button id="wheel-close" aria-label="추첨 창 닫기" onclick="closeWheelModal()" class="absolute top-4 right-4 text-gray-400 hover:text-white text-xl font-bold focus:outline-none cursor-pointer">✕</button>
             
             <h3 id="wheel-modal-title" class="text-lg font-bold text-white mb-4">외계종 돌림판 추첨</h3>
 
@@ -156,13 +159,13 @@
                 <div class="absolute -top-3 left-1/2 transform -translate-x-1/2 z-20">
                     <div class="w-0 h-0 border-l-[12px] border-l-transparent border-r-[12px] border-r-transparent border-t-[20px] border-t-amber-400 drop-shadow-[0_4px_6px_rgba(251,191,36,0.8)]"></div>
                 </div>
-                <canvas id="wheelCanvas" width="600" height="600" class="w-full h-full rounded-full shadow-2xl border-4 border-[#30363d]"></canvas>
+                <canvas id="wheelCanvas" aria-hidden="true" width="600" height="600" class="w-full h-full rounded-full shadow-2xl border-4 border-[#30363d]"></canvas>
             </div>
 
             <!-- 추첨 제어 버튼 -->
             <div class="mt-6">
                 <button id="btn-spin-action" onclick="handleSpinAction()" class="w-full py-3.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-base shadow-lg transition-all cursor-pointer">
-                    🎲 <span id="btn-spin-label">추첨 시작</span>
+                    🎲 <span id="btn-spin-label" aria-live="polite">추첨 시작</span>
                 </button>
             </div>
         </div>

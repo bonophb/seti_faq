@@ -20,20 +20,36 @@
             rightWinner: null
         };
 
+        let stateRecovered = false;
+        function normalizeRandomizerState(value) {
+            const initial = { step: 'mode', mode: null, banned: [], leftWinner: null, rightWinner: null };
+            if (!value || typeof value !== 'object' || Array.isArray(value) ||
+                !['BASE', 'EXP'].includes(value.mode)) return initial;
+            const pool = ALIEN_SPECIES.filter(item => value.mode === 'EXP' || !item.exp).map(item => item.id);
+            const banned = [...new Set(Array.isArray(value.banned) ? value.banned : [])]
+                .filter(id => pool.includes(id)).slice(0, pool.length - 2);
+            const available = pool.filter(id => !banned.includes(id));
+            const leftWinner = available.includes(value.leftWinner) ? value.leftWinner : null;
+            const rightWinner = available.includes(value.rightWinner) && value.rightWinner !== leftWinner
+                ? value.rightWinner : null;
+            return {
+                step: ['mode', 'ban', 'slots'].includes(value.step) ? value.step : 'ban',
+                mode: value.mode, banned, leftWinner, rightWinner
+            };
+        }
+
         function loadState() {
-            const saved = localStorage.getItem('seti_randomizer_state');
-            if (saved) {
-                try {
-                    appState = JSON.parse(saved);
-                } catch(e) {}
-            }
-            const savedLang = localStorage.getItem('seti_randomizer_lang');
-            if (savedLang) currentLang = savedLang;
+            const saved = readPreference('seti_randomizer_state');
+            if (!saved) return;
+            try {
+                const value = JSON.parse(saved);
+                appState = normalizeRandomizerState(value);
+                stateRecovered = JSON.stringify(value) !== JSON.stringify(appState);
+            } catch (error) { stateRecovered = true; }
         }
 
         function saveState() {
-            localStorage.setItem('seti_randomizer_state', JSON.stringify(appState));
-            localStorage.setItem('seti_randomizer_lang', currentLang);
+            writePreference('seti_randomizer_state', JSON.stringify(appState));
         }
 
         const i18n = {
@@ -102,6 +118,7 @@
         };
 
         function setLanguage(lang) {
+            lang = applyLanguagePreference(lang);
             currentLang = lang;
             document.querySelectorAll('.lang-btn').forEach(btn => btn.classList.remove('active'));
             const activeBtn = document.getElementById(`lang-${lang}`);
@@ -133,8 +150,15 @@
             document.getElementById('text-btn-spin-right').textContent = t.spinRight;
             document.getElementById('btn-back-ban').textContent = t.backBan;
 
+            document.getElementById('wheel-close').setAttribute('aria-label', lang === 'KO' ? '추첨 창 닫기' : 'Close draw dialog');
             saveState();
             renderUI();
+            if (!document.getElementById('wheelModal').classList.contains('hidden')) {
+                document.getElementById('wheel-modal-title').textContent = currentSlotTarget === 'LEFT'
+                    ? t.wheelTitleLeft : t.wheelTitleRight;
+                updateSpinButtonState();
+                drawWheel(currentRotation);
+            }
         }
 
         function showToast(msg) {
@@ -162,10 +186,12 @@
             appState.step = step;
             saveState();
             renderUI();
+            document.getElementById({mode:'title-step1',ban:'title-step2',slots:'title-step3'}[step]).focus();
         }
 
         function toggleBan(id) {
             const currentPool = ALIEN_SPECIES.filter(s => appState.mode === 'EXP' || !s.exp);
+            if (!currentPool.some(item => item.id === id)) return;
             const isCurrentlyBanned = appState.banned.includes(id);
 
             if (!isCurrentlyBanned) {
@@ -183,6 +209,7 @@
             appState.rightWinner = null;
             saveState();
             renderBanGrid();
+            document.getElementById('ban-' + id).focus();
         }
 
         function confirmBanSelection() {
@@ -222,7 +249,11 @@
                 const isBanned = appState.banned.includes(item.id);
                 const name = currentLang === 'KO' ? item.ko : item.en;
                 
-                const card = document.createElement('div');
+                const card = document.createElement('button');
+                card.type = 'button';
+                card.id = 'ban-' + item.id;
+                card.setAttribute('aria-pressed', String(isBanned));
+                card.setAttribute('aria-label', (currentLang === 'KO' ? '제외: ' : 'Exclude: ') + name);
                 card.className = `alien-card p-4 rounded-xl border text-center cursor-pointer transition-all ${isBanned ? 'bg-[#0d1117] border-red-900/60 opacity-40 grayscale' : 'glass-card hover:border-[#58a6ff]'}`;
                 card.onclick = () => toggleBan(item.id);
 
@@ -294,6 +325,7 @@
         }
 
         // 룰렛 돌림판 엔진
+        let modalReturnFocus = null;
         let currentSlotTarget = null;
         let wheelCandidates = [];
         let currentRotation = 0;
@@ -306,6 +338,8 @@
         let stopDuration = 3800;
 
         function openWheelModal(slot) {
+            if (isSpinning || !['LEFT', 'RIGHT'].includes(slot)) return;
+            modalReturnFocus = document.activeElement;
             currentSlotTarget = slot;
             const t = i18n[currentLang];
             document.getElementById('wheel-modal-title').textContent = slot === 'LEFT' ? t.wheelTitleLeft : t.wheelTitleRight;
@@ -318,6 +352,7 @@
                 return matchesMode && notBanned && notOpposite;
             });
 
+            if (!wheelCandidates.length) return;
             isSpinning = false;
             isStopping = false;
             currentRotation = 0;
@@ -325,6 +360,8 @@
             
             document.getElementById('wheelModal').classList.remove('hidden');
             drawWheel(0);
+            document.getElementById('page-content').inert = true;
+            document.getElementById('btn-spin-action').focus();
         }
 
         function closeWheelModal() {
@@ -332,6 +369,9 @@
             if (isSpinning) return;
             cancelAnimationFrame(animationFrameId);
             document.getElementById('wheelModal').classList.add('hidden');
+            document.getElementById('page-content').inert = false;
+            if (modalReturnFocus && !modalReturnFocus.closest('.hidden')) modalReturnFocus.focus();
+            else document.getElementById('title-step3').focus();
         }
 
         function updateSpinButtonState() {
@@ -371,6 +411,7 @@
                 stopStartTime = performance.now();
                 startRotationAtStop = currentRotation;
                 updateSpinButtonState();
+                document.getElementById('wheelModal').focus();
 
                 const winnerIndex = Math.floor(Math.random() * wheelCandidates.length);
                 const winner = wheelCandidates[winnerIndex];
@@ -417,7 +458,7 @@
             } else {
                 // Remain locked until the result reveal finishes.
                 document.getElementById('btn-spin-label').textContent =
-                    currentLang === 'KO' ? '추첨 완료' : 'Discovery complete';
+                    currentLang === 'KO' ? winner.ko + ' 발견!' : winner.en + ' discovered!';
                 
                 if (currentSlotTarget === 'LEFT') {
                     appState.leftWinner = winner.id;
@@ -441,8 +482,8 @@
                     isSpinning = false;
                     isStopping = false;
                     updateSpinButtonState();
-                    closeWheelModal();
                     renderSlots();
+                    closeWheelModal();
                 }, 800);
             }
         }
@@ -508,3 +549,20 @@
 
         loadState();
         setLanguage(currentLang);
+
+document.getElementById('wheelModal').addEventListener('keydown', event => {
+    if (event.key === 'Escape') { event.preventDefault(); closeWheelModal(); return; }
+    if (event.key !== 'Tab') return;
+    const modal = document.getElementById('wheelModal');
+    const controls = Array.from(modal.querySelectorAll('button:not(:disabled), [href], [tabindex="0"]'))
+        .filter(element => !element.closest('.hidden'));
+    const first = controls[0], last = controls[controls.length - 1];
+    if (!first) { event.preventDefault(); modal.focus(); return; }
+    if (event.shiftKey && (document.activeElement === first || !controls.includes(document.activeElement))) {
+        event.preventDefault(); last.focus();
+    } else if (!event.shiftKey && (document.activeElement === last || !controls.includes(document.activeElement))) {
+        event.preventDefault(); first.focus();
+    }
+});
+if (stateRecovered) showToast(currentLang === 'KO'
+    ? '저장된 추첨 정보의 오류를 복구했습니다.' : 'Saved draw data was repaired.');

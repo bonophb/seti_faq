@@ -28,12 +28,15 @@
         .tab-btn.active, .lang-btn.active { background-color: #1f6beb; border-color: #388bfd; color: #ffffff; font-weight: 600; }
         .category-btn { background-color: #21262d; color: #8b949e; }
         .category-btn.active { background-color: #388bfd; color: #ffffff; }
+        button:focus-visible, a:focus-visible, input:focus-visible, [tabindex]:focus-visible {
+            outline: 3px solid #58a6ff !important; outline-offset: 3px;
+        }
     </style>
 </head>
 <body class="min-h-screen py-10 px-4 sm:px-6 lg:px-8">
     <div class="max-w-4xl mx-auto">
         <!-- 상단 알림 토스트 -->
-        <div id="toast" class="hidden fixed top-6 left-1/2 transform -translate-x-1/2 bg-[#161b22]/95 border border-[#58a6ff] text-white px-5 py-3 rounded-2xl shadow-2xl z-50 text-sm font-medium transition-all flex items-center gap-2.5 backdrop-blur-md">
+        <div id="toast" role="status" aria-live="polite" class="hidden fixed top-6 left-1/2 transform -translate-x-1/2 bg-[#161b22]/95 border border-[#58a6ff] text-white px-5 py-3 rounded-2xl shadow-2xl z-50 text-sm font-medium transition-all flex items-center gap-2.5 backdrop-blur-md">
             <span id="toast-icon">✨</span>
             <span id="toast-msg">알림</span>
         </div>
@@ -66,7 +69,7 @@
 
                 <!-- 공식 룰북 드롭다운 메뉴 -->
                 <div class="relative inline-block text-left" id="rulebookDropdownContainer">
-                    <button onclick="toggleRulebookDropdown(event)" class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-[#161b22] hover:bg-[#21262d] border border-[#30363d] hover:border-[#58a6ff] text-gray-200 hover:text-white transition-all shadow-sm cursor-pointer focus:outline-none">
+                    <button id="rulebook-button" aria-expanded="false" aria-controls="rulebookDropdownMenu" onclick="toggleRulebookDropdown(event)" class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-[#161b22] hover:bg-[#21262d] border border-[#30363d] hover:border-[#58a6ff] text-gray-200 hover:text-white transition-all shadow-sm cursor-pointer focus:outline-none">
                         <span>📖</span>
                         <span id="rulebook-btn-text">공식 룰북</span>
                         <span class="text-[10px] text-gray-400">▼</span>
@@ -136,7 +139,7 @@
         <!-- 검색창 -->
         <div class="mb-6">
             <div class="relative">
-                <input type="text" id="searchInput" placeholder="질문 제목, 답변 내용, 카드 번호(예: 15, #15, ET.1) 검색..." 
+                <input type="text" id="searchInput" aria-label="FAQ 검색 / Search FAQs" placeholder="질문 제목, 답변 내용, 카드 번호(예: 15, #15, ET.1) 검색..." 
                        class="w-full bg-[#161b22] border border-[#30363d] rounded-xl px-5 py-3.5 text-white placeholder-gray-500 focus:outline-none focus:border-[#58a6ff] focus:ring-1 focus:ring-[#58a6ff] text-base">
                 <span class="absolute right-4 top-3.5 text-gray-500">🔍</span>
             </div>

@@ -127,6 +127,8 @@
             e.stopPropagation();
             const menu = document.getElementById('rulebookDropdownMenu');
             menu.classList.toggle('hidden');
+            document.getElementById('rulebook-button').setAttribute('aria-expanded', String(!menu.classList.contains('hidden')));
+            if (!menu.classList.contains('hidden')) menu.querySelector('a').focus();
         }
 
         window.addEventListener('click', (e) => {
@@ -134,10 +136,17 @@
             const menu = document.getElementById('rulebookDropdownMenu');
             if (container && !container.contains(e.target) && menu && !menu.classList.contains('hidden')) {
                 menu.classList.add('hidden');
+                document.getElementById('rulebook-button').setAttribute('aria-expanded', 'false');
             }
         });
 
         function setLanguage(lang) {
+            const selectedCategory = faqData.find(item =>
+                item.cat_ko === currentCategory || item.cat_en === currentCategory);
+            lang = applyLanguagePreference(lang);
+            if (currentCategory !== '전체' && selectedCategory) {
+                currentCategory = lang === 'KO' ? selectedCategory.cat_ko : selectedCategory.cat_en;
+            }
             currentLang = lang;
             document.querySelectorAll('.lang-btn').forEach(btn => btn.classList.remove('active'));
             const activeBtn = document.getElementById(`lang-${lang}`);
@@ -320,9 +329,14 @@
                 const btn = document.createElement('button');
                 btn.className = `category-btn px-4 py-2 rounded-full text-sm font-medium transition-colors ${cat === currentCategory ? 'active' : ''}`;
                 btn.textContent = cat === '전체' ? tAll : cat;
+                btn.setAttribute('aria-pressed', String(cat === currentCategory));
                 btn.onclick = () => {
                     currentCategory = cat;
-                    document.querySelectorAll('.category-btn').forEach(b => b.classList.remove('active'));
+                    document.querySelectorAll('.category-btn').forEach(b => {
+                        b.classList.remove('active');
+                        b.setAttribute('aria-pressed', 'false');
+                    });
+                    btn.setAttribute('aria-pressed', 'true');
                     btn.classList.add('active');
                     renderFAQs();
                 };
@@ -334,6 +348,7 @@
             const box = document.getElementById(`en-box-${id}`);
             if (box) {
                 box.classList.toggle('hidden');
+                document.getElementById(`en-toggle-${id}`).setAttribute('aria-expanded', String(!box.classList.contains('hidden')));
                 
                 if (!box.classList.contains('hidden')) {
                     const item = faqData.find(d => d.id === id);
@@ -650,11 +665,13 @@
                 if (answer && answer.classList.contains('hidden')) {
                     answer.classList.remove('hidden');
                     if (icon) icon.textContent = '−';
+                    document.getElementById(`faq-toggle-${targetId}`).setAttribute('aria-expanded', 'true');
                 }
 
                 setTimeout(() => {
                     const cardEl = document.getElementById(`faq-card-${targetId}`);
                     if (cardEl) {
+                        document.getElementById(`faq-toggle-${targetId}`).focus({ preventScroll: true });
                         cardEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
                         cardEl.classList.add('ring-2', 'ring-blue-500', 'shadow-[0_0_25px_rgba(59,130,246,0.6)]');
                         setTimeout(() => {
@@ -678,6 +695,8 @@
         }
 
         function renderFAQs() {
+            document.querySelectorAll('.tab-btn').forEach(button =>
+                button.setAttribute('aria-pressed', String(button.id === 'tab-' + currentEdition)));
             const rawQuery = document.getElementById('searchInput').value.toLowerCase().trim();
             const cardNumberPattern = getCardNumberPattern(rawQuery);
             const listContainer = document.getElementById('faqList');
@@ -722,17 +741,17 @@
                 const slug = generateFaqSlug(item, item.id);
                 
                 const displayQuestion = currentLang === 'EN' ? (item.q_en || item.q_ko) : (item.q_ko || item.q_en);
-                const displayAnswer = currentLang === 'EN' ? (item.a_en || item.a_ko).replace(/\n/g, '<br>') : item.a_ko.replace(/\n/g, '<br>');
+                const displayAnswer = formatFaqAnswer(currentLang === 'EN' ? (item.a_en || item.a_ko) : (item.a_ko || item.a_en));
 
                 return `
                 <div class="faq-item rounded-2xl overflow-hidden" id="faq-card-${item.id}">
-                    <button onclick="toggleFAQ(${item.id})" class="w-full text-left p-5 flex justify-between items-center focus:outline-none cursor-pointer">
+                    <button id="faq-toggle-${item.id}" aria-expanded="false" aria-controls="answer-${item.id}" onclick="toggleFAQ(${item.id})" class="w-full text-left p-5 flex justify-between items-center focus:outline-none cursor-pointer">
                         <div>
                             <div class="flex gap-2 items-center mb-2.5">
-                                <span class="text-xs px-2.5 py-1 rounded-md font-semibold ${badgeColor}">${edLabel}</span>
-                                <span class="text-xs px-2.5 py-1 rounded-md bg-gray-800 text-gray-300 font-medium border border-gray-700/40">${catLabel}</span>
+                                <span class="text-xs px-2.5 py-1 rounded-md font-semibold ${badgeColor}">${escapeHtml(edLabel)}</span>
+                                <span class="text-xs px-2.5 py-1 rounded-md bg-gray-800 text-gray-300 font-medium border border-gray-700/40">${escapeHtml(catLabel)}</span>
                             </div>
-                            <h3 class="text-lg font-semibold text-white leading-snug">${displayQuestion}</h3>
+                            <h3 class="text-lg font-semibold text-white leading-snug">${escapeHtml(displayQuestion)}</h3>
                         </div>
                         <span id="icon-${item.id}" class="text-gray-400 text-xl ml-4 font-bold">+</span>
                     </button>
@@ -748,9 +767,9 @@
                         ${currentLang === 'KO' && item.a_en && item.a_en !== item.a_ko ? `
                             <div id="en-box-${item.id}" class="hidden mt-3 p-4 rounded-xl bg-[#161b22] border border-blue-900/50 text-xs sm:text-sm text-gray-300 leading-relaxed space-y-2">
                                 <div class="font-bold text-blue-300 border-b border-[#30363d] pb-2 flex items-center gap-1.5">
-                                    <span>🇺🇸</span> <span>${item.q_en}</span>
+                                    <span>🇺🇸</span> <span>${escapeHtml(item.q_en)}</span>
                                 </div>
-                                <div>${item.a_en.replace(/\n/g, '<br>')}</div>
+                                <div>${formatFaqAnswer(item.a_en)}</div>
                             </div>
                         ` : ''}
 
@@ -758,7 +777,7 @@
                         <div class="mt-3 flex flex-wrap items-center justify-between gap-2">
                             <div>
                                 ${currentLang === 'KO' && item.a_en && item.a_en !== item.a_ko ? `
-                                    <button onclick="toggleEnOriginal(${item.id})" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#21262d] hover:bg-[#30363d] border border-[#30363d] hover:border-[#58a6ff] text-xs font-medium text-gray-200 hover:text-white transition-all shadow-sm focus:outline-none cursor-pointer">
+                                    <button id="en-toggle-${item.id}" aria-expanded="false" aria-controls="en-box-${item.id}" onclick="toggleEnOriginal(${item.id})" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#21262d] hover:bg-[#30363d] border border-[#30363d] hover:border-[#58a6ff] text-xs font-medium text-gray-200 hover:text-white transition-all shadow-sm focus:outline-none cursor-pointer">
                                         <span>🇺🇸</span>
                                         <span>영어 원문 보기</span>
                                     </button>
@@ -798,6 +817,7 @@
                 } else {
                     answer.classList.add('hidden');
                     if (icon) icon.textContent = '+';
+                    document.getElementById(`faq-toggle-${id}`).setAttribute('aria-expanded', 'false');
                 }
             }
         }
@@ -816,4 +836,15 @@
             }
         });
 
+        setLanguage(currentLang);
         loadCSV(PUBLISHED_URL);
+
+document.getElementById('rulebookDropdownContainer').addEventListener('keydown', event => {
+    if (event.key === 'Escape') {
+        document.getElementById('rulebookDropdownMenu').classList.add('hidden');
+        const button = document.getElementById('rulebook-button');
+        button.setAttribute('aria-expanded', 'false');
+        button.focus();
+        event.preventDefault();
+    }
+});
