@@ -328,12 +328,19 @@
         }
 
         function closeWheelModal() {
-            if (isSpinning && !isStopping) return;
+            // Keep the selected result intact through spinning, deceleration and reveal.
+            if (isSpinning) return;
             cancelAnimationFrame(animationFrameId);
             document.getElementById('wheelModal').classList.add('hidden');
         }
 
         function updateSpinButtonState() {
+            const closeButton = document.querySelector('#wheelModal button[onclick="closeWheelModal()"]');
+            if (closeButton) {
+                closeButton.disabled = isSpinning;
+                closeButton.classList.toggle('opacity-40', isSpinning);
+                closeButton.classList.toggle('cursor-not-allowed', isSpinning);
+            }
             const btn = document.getElementById('btn-spin-action');
             const label = document.getElementById('btn-spin-label');
             const t = i18n[currentLang];
@@ -408,8 +415,9 @@
             if (progress < 1) {
                 animationFrameId = requestAnimationFrame((t) => animateDeceleration(t, winner));
             } else {
-                isSpinning = false;
-                isStopping = false;
+                // Remain locked until the result reveal finishes.
+                document.getElementById('btn-spin-label').textContent =
+                    currentLang === 'KO' ? '추첨 완료' : 'Discovery complete';
                 
                 if (currentSlotTarget === 'LEFT') {
                     appState.leftWinner = winner.id;
@@ -430,6 +438,9 @@
                 });
 
                 setTimeout(() => {
+                    isSpinning = false;
+                    isStopping = false;
+                    updateSpinButtonState();
                     closeWheelModal();
                     renderSlots();
                 }, 800);
