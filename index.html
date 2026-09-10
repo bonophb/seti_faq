@@ -418,6 +418,7 @@
 
                         return {
                             id: idx,
+                            faqId: (item['ID'] || '').trim().toLowerCase(),
                             edition: ed,
                             cat_ko: cat_ko,
                             cat_en: cat_en,
@@ -526,7 +527,205 @@
         }
 
         // 고유 Slug 생성 엔진 (충돌 방지 정밀 매핑)
+        // Permanent IDs from the sheet. Keep this migration map when rows are reordered.
+        const LEGACY_FAQ_IDS = {
+    "card-1": "seti-0055",
+    "card-101": "seti-0082",
+    "card-103": "seti-0083",
+    "card-106": "seti-0084",
+    "card-107": "seti-0085",
+    "card-11": "seti-0057",
+    "card-112": "seti-0086",
+    "card-113": "seti-0087",
+    "card-114": "seti-0088",
+    "card-116": "seti-0089",
+    "card-117": "seti-0090",
+    "card-118": "seti-0091",
+    "card-119": "seti-0092",
+    "card-120": "seti-0093",
+    "card-122": "seti-0094",
+    "card-123": "seti-0095",
+    "card-124": "seti-0096",
+    "card-125": "seti-0097",
+    "card-126": "seti-0098",
+    "card-127": "seti-0099",
+    "card-128": "seti-0100",
+    "card-129": "seti-0101",
+    "card-133": "seti-0102",
+    "card-134": "seti-0103",
+    "card-135": "seti-0104",
+    "card-136": "seti-0105",
+    "card-138": "seti-0106",
+    "card-15": "seti-0058",
+    "card-16": "seti-0059",
+    "card-17": "seti-0060",
+    "card-19": "seti-0061",
+    "card-20": "seti-0062",
+    "card-25": "seti-0063",
+    "card-26": "seti-0064",
+    "card-27": "seti-0065",
+    "card-30": "seti-0066",
+    "card-45": "seti-0067",
+    "card-49": "seti-0068",
+    "card-51": "seti-0069",
+    "card-58": "seti-0070",
+    "card-60": "seti-0071",
+    "card-65": "seti-0072",
+    "card-67": "seti-0073",
+    "card-73": "seti-0074",
+    "card-78": "seti-0075",
+    "card-81": "seti-0076",
+    "card-84": "seti-0077",
+    "card-88": "seti-0078",
+    "card-89": "seti-0079",
+    "card-9": "seti-0056",
+    "card-91": "seti-0080",
+    "card-98": "seti-0081",
+    "et-1": "seti-0107",
+    "et-13": "seti-0110",
+    "et-14": "seti-0111",
+    "et-15": "seti-0112",
+    "et-20": "seti-0113",
+    "et-21": "seti-0114",
+    "et-22": "seti-0115",
+    "et-23": "seti-0116",
+    "et-27": "seti-0117",
+    "et-29": "seti-0118",
+    "et-31": "seti-0119",
+    "et-5": "seti-0108",
+    "et-6": "seti-0109",
+    "exp-card-10": "seti-0140",
+    "exp-card-12": "seti-0141",
+    "exp-card-13": "seti-0142",
+    "exp-card-15": "seti-0143",
+    "exp-card-16": "seti-0144",
+    "exp-card-17": "seti-0145",
+    "exp-card-18": "seti-0146",
+    "exp-card-19": "seti-0147",
+    "exp-card-2": "seti-0136",
+    "exp-card-20": "seti-0148",
+    "exp-card-22": "seti-0150",
+    "exp-card-23": "seti-0151",
+    "exp-card-26": "seti-0152",
+    "exp-card-27": "seti-0153",
+    "exp-card-28": "seti-0154",
+    "exp-card-29": "seti-0155",
+    "exp-card-32": "seti-0156",
+    "exp-card-33": "seti-0157",
+    "exp-card-34": "seti-0158",
+    "exp-card-35": "seti-0159",
+    "exp-card-37": "seti-0160",
+    "exp-card-38": "seti-0161",
+    "exp-card-42": "seti-0162",
+    "exp-card-5": "seti-0137",
+    "exp-card-7": "seti-0138",
+    "exp-card-8": "seti-0139",
+    "exp-et-1": "seti-0163",
+    "exp-et-11": "seti-0166",
+    "exp-et-14": "seti-0167",
+    "exp-et-19": "seti-0168",
+    "exp-et-3": "seti-0164",
+    "exp-et-34": "seti-0169",
+    "exp-et-9": "seti-0165",
+    "faq-1": "seti-0001",
+    "faq-10": "seti-0010",
+    "faq-11": "seti-0011",
+    "faq-12": "seti-0012",
+    "faq-121": "seti-0121",
+    "faq-122": "seti-0122",
+    "faq-123": "seti-0123",
+    "faq-124": "seti-0124",
+    "faq-13": "seti-0013",
+    "faq-14": "seti-0014",
+    "faq-15": "seti-0015",
+    "faq-16": "seti-0016",
+    "faq-17": "seti-0017",
+    "faq-18": "seti-0018",
+    "faq-19": "seti-0019",
+    "faq-2": "seti-0002",
+    "faq-20": "seti-0020",
+    "faq-21": "seti-0021",
+    "faq-22": "seti-0022",
+    "faq-23": "seti-0023",
+    "faq-24": "seti-0024",
+    "faq-25": "seti-0025",
+    "faq-26": "seti-0026",
+    "faq-27": "seti-0027",
+    "faq-28": "seti-0028",
+    "faq-29": "seti-0029",
+    "faq-3": "seti-0003",
+    "faq-30": "seti-0030",
+    "faq-31": "seti-0031",
+    "faq-32": "seti-0032",
+    "faq-33": "seti-0033",
+    "faq-34": "seti-0034",
+    "faq-35": "seti-0035",
+    "faq-36": "seti-0036",
+    "faq-37": "seti-0037",
+    "faq-38": "seti-0038",
+    "faq-39": "seti-0039",
+    "faq-4": "seti-0004",
+    "faq-40": "seti-0040",
+    "faq-41": "seti-0041",
+    "faq-42": "seti-0042",
+    "faq-43": "seti-0043",
+    "faq-44": "seti-0044",
+    "faq-45": "seti-0045",
+    "faq-46": "seti-0046",
+    "faq-47": "seti-0047",
+    "faq-48": "seti-0048",
+    "faq-49": "seti-0049",
+    "faq-5": "seti-0005",
+    "faq-50": "seti-0050",
+    "faq-51": "seti-0051",
+    "faq-52": "seti-0052",
+    "faq-53": "seti-0053",
+    "faq-54": "seti-0054",
+    "faq-6": "seti-0006",
+    "faq-7": "seti-0007",
+    "faq-8": "seti-0008",
+    "faq-9": "seti-0009",
+    "org-1": "seti-0125",
+    "org-10": "seti-0134",
+    "org-11": "seti-0135",
+    "org-2": "seti-0126",
+    "org-21": "seti-0149",
+    "org-3": "seti-0127",
+    "org-4": "seti-0128",
+    "org-5": "seti-0129",
+    "org-6": "seti-0130",
+    "org-7": "seti-0131",
+    "org-8": "seti-0132",
+    "org-9": "seti-0133",
+    "promo-se-en-01": "seti-0120",
+    "promo-se-en-03": "seti-0170"
+};
+
+        function findFaqByStableId(value) {
+            if (!/^seti-\d{4,}$/.test(value || '')) return null;
+            const matches = faqData.filter(item => item.faqId === value);
+            return matches.length === 1 ? matches[0] : null;
+        }
+
         function generateFaqSlug(item, index) {
+            return findFaqByStableId(item.faqId) === item
+                ? item.faqId : generateLegacyFaqSlug(item, index);
+        }
+
+        function resolveFaqLink(slug) {
+            if (/^seti-/.test(slug)) return findFaqByStableId(slug);
+
+            const mappedId = LEGACY_FAQ_IDS[slug];
+            if (mappedId && faqData.some(item => item.faqId)) {
+                return findFaqByStableId(mappedId);
+            }
+            // Support old cached CSVs and card aliases; never infer an ID from partial text.
+            return faqData.find((item, index) =>
+                (!item.faqId || !/^faq-\d+$/.test(slug)) &&
+                generateLegacyFaqSlug(item, index) === slug) || null;
+        }
+
+        function generateLegacyFaqSlug(item, index) {
             const isExp = item.edition === '확장' || (item.cat_ko && item.cat_ko.includes('확장'));
             const str = ((item.q_en || '') + ' ' + (item.q_ko || '')).trim();
             const catKo = (item.cat_ko || '').toLowerCase();
@@ -611,38 +810,10 @@
             const rawHash = window.location.hash.replace('#', '').trim().toLowerCase();
             if (!rawHash || faqData.length === 0) return;
 
-            let targetItem = null;
-
-            for (let i = 0; i < faqData.length; i++) {
-                const item = faqData[i];
-                const slug = generateFaqSlug(item, i);
-                if (slug === rawHash) {
-                    targetItem = item;
-                    break;
-                }
-            }
-
-            if (!targetItem) {
-                for (let i = 0; i < faqData.length; i++) {
-                    const item = faqData[i];
-                    const slug = generateFaqSlug(item, i);
-                    
-                    if (slug === 'promo-' + rawHash || slug === rawHash.replace('card-', 'promo-') || slug === 'exp-' + rawHash || slug === rawHash.replace('card-', 'org-')) {
-                        targetItem = item;
-                        break;
-                    }
-
-                    const cleanKey = rawHash.replace(/^(card|org|promo|faq|solo|exp|base)-/, '').replace(/[-_]/g, ' ');
-                    const qKo = item.q_ko.toLowerCase();
-                    const qEn = item.q_en.toLowerCase();
-                    if (qKo.includes('#' + cleanKey) || qEn.includes('#' + cleanKey) || qKo.includes(cleanKey) || qEn.includes(cleanKey)) {
-                        targetItem = item;
-                        break;
-                    }
-                }
-            }
+            const targetItem = resolveFaqLink(rawHash);
 
             if (targetItem) {
+                document.getElementById('searchInput').value = '';
                 currentEdition = targetItem.edition;
                 currentCategory = '전체';
                 document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
