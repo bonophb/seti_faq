@@ -1,8 +1,9 @@
 const CACHE_PREFIX = 'seti-faq-';
-const CACHE_NAME = CACHE_PREFIX + 'v4';
+const CACHE_NAME = CACHE_PREFIX + 'v5';
 const LOCAL_ASSETS = [
   './', './index.html', './randomizer.html', './manifest.json',
-  './icon-192.png', './icon-512.png'
+  './icon-192.png', './icon-512.png',
+  './shared.js', './faq.js', './randomizer.js'
 ];
 const EXTERNAL_ASSETS = [
   'https://cdn.tailwindcss.com/',
