@@ -248,7 +248,7 @@
                 copyLink: "링크 복사",
                 noResult: "검색 조건에 맞는 FAQ가 없습니다.",
                 loading: "FAQ 데이터를 불러오는 중입니다...",
-                delayMsg: "데이터 로드가 지연되어 캐시를 삭제하고 자동 재시도합니다...",
+                delayMsg: "데이터 로드가 지연되어 다른 경로로 다시 시도합니다...",
                 reloadBtn: "지금 강력 새로고침"
             },
             EN: {
@@ -267,7 +267,7 @@
                 copyLink: "Copy Link",
                 noResult: "No FAQs match your search criteria.",
                 loading: "Loading FAQ data...",
-                delayMsg: "Loading delayed over 30s. Clearing cache and auto-retrying...",
+                delayMsg: "Loading delayed over 30s. Retrying another data source...",
                 reloadBtn: "Force Reload Now"
             }
         };
@@ -339,18 +339,34 @@
             renderFAQs();
         }
 
-        function getBustedUrl(url) {
-            const separator = url.includes('?') ? '&' : '?';
-            return `${url}${separator}_cb=${Date.now()}`;
+        const FAQ_BACKUP_KEY = 'seti_faq_data_v1';
+
+        function restoreFaqBackup() {
+            try {
+                const data = JSON.parse(localStorage.getItem(FAQ_BACKUP_KEY));
+                const fields = ['edition', 'cat_ko', 'cat_en', 'q_ko', 'a_ko', 'q_en', 'a_en'];
+                if (!Array.isArray(data) || !data.length ||
+                    !data.every(item => item && Number.isInteger(item.id) &&
+                        fields.every(field => typeof item[field] === 'string'))) return false;
+                faqData = data;
+                isLoaded = true;
+                clearTimeout(loadTimer);
+                setLanguage(currentLang);
+                checkDeepLink();
+                showToast(currentLang === 'KO'
+                    ? '저장된 FAQ를 표시합니다. 최신 내용은 인터넷 연결 후 확인해 주세요.'
+                    : 'Showing saved FAQs. Reconnect to check for updates.', '📂');
+                return true;
+            } catch (error) {
+                return false;
+            }
         }
 
         function startTimeoutTimer() {
             clearTimeout(loadTimer);
             loadTimer = setTimeout(() => {
                 if (!isLoaded) {
-                    if ('caches' in window) {
-                        caches.keys().then(names => names.forEach(name => caches.delete(name)));
-                    }
+                    if (restoreFaqBackup()) return;
                     const t = i18n[currentLang];
                     document.getElementById('faqList').innerHTML = 
                         `<div class="text-center py-12 text-amber-400 font-medium leading-relaxed">
@@ -362,11 +378,17 @@
             }, 30000);
         }
 
-        function forceReload() {
-            if ('caches' in window) {
-                caches.keys().then(names => names.forEach(name => caches.delete(name)));
-            }
-            window.location.href = window.location.pathname + '?_t=' + Date.now();
+        async function forceReload() {
+            try {
+                if ('caches' in window) {
+                    const names = await caches.keys();
+                    await Promise.all(names.filter(name => name.startsWith('seti-faq-'))
+                        .map(name => caches.delete(name)));
+                }
+            } catch (error) {}
+            const url = new URL(window.location.href);
+            url.searchParams.set('_t', Date.now());
+            window.location.href = url.href;
         }
 
         function loadCSV(url, isFallback = false) {
@@ -375,7 +397,7 @@
                 startTimeoutTimer();
             }
 
-            Papa.parse(getBustedUrl(url), {
+            Papa.parse(url, {
                 download: true,
                 header: true,
                 skipEmptyLines: true,
@@ -410,6 +432,9 @@
                         isLoaded = true;
                         clearTimeout(loadTimer);
                         faqData = parsed;
+                        try {
+                            localStorage.setItem(FAQ_BACKUP_KEY, JSON.stringify(parsed));
+                        } catch (error) {}
                         
                         setLanguage(currentLang);
                         checkDeepLink();
@@ -417,6 +442,7 @@
                         loadCSV(GVIZ_URL, true);
                     } else {
                         clearTimeout(loadTimer);
+                        if (restoreFaqBackup()) return;
                         showError('FAQ 데이터를 읽지 못했습니다. 구글 시트 공유 설정을 확인해주세요.');
                     }
                 },
@@ -425,6 +451,7 @@
                         loadCSV(GVIZ_URL, true);
                     } else {
                         clearTimeout(loadTimer);
+                        if (restoreFaqBackup()) return;
                         showError('데이터 로드에 실패했습니다. 아래 버튼을 눌러 강력 새로고침을 시도해보세요.<br><button onclick="forceReload()" class="mt-4 px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-500">강력 새로고침</button>');
                     }
                 }
