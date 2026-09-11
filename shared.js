@@ -5,9 +5,19 @@ gtag('js', new Date());
 gtag('config', 'G-D8WD3NKS7N');
 
 function trackEvent(eventName, params = {}) {
-    if (typeof gtag === 'function') {
-        gtag('event', eventName, params);
-    }
+    // Analytics must never block the site's primary actions.
+    try {
+        const clean = {
+            ui_language: (document.documentElement.lang || 'ko').toUpperCase(),
+            page_type: window.location.pathname.endsWith('randomizer.html') ? 'randomizer' : 'faq',
+            tracking_version: '2'
+        };
+        for (const [key, value] of Object.entries(params)) {
+            if (typeof value === 'string') clean[key] = value.slice(0, 100);
+            else if (typeof value === 'number' && Number.isFinite(value)) clean[key] = value;
+        }
+        if (typeof gtag === 'function') gtag('event', eventName, clean);
+    } catch (error) {}
 }
 
 function detectLanguage() {
@@ -31,8 +41,12 @@ function readPreference(key) {
 function writePreference(key, value) {
     try { localStorage.setItem(key, value); return true; } catch (error) { return false; }
 }
-function applyLanguagePreference(lang) {
+function applyLanguagePreference(lang, source = 'system') {
     if (!['KO', 'EN'].includes(lang)) lang = detectLanguage();
+    const previous = (document.documentElement.lang || '').toUpperCase();
+    if (source === 'user' && ['KO', 'EN'].includes(previous) && previous !== lang) {
+        trackEvent('language_change', { previous_language: previous, ui_language: lang });
+    }
     writePreference(LANGUAGE_KEY, lang);
     document.documentElement.lang = lang === 'KO' ? 'ko' : 'en';
     document.querySelectorAll('.lang-btn').forEach(button =>
@@ -41,7 +55,7 @@ function applyLanguagePreference(lang) {
 }
 window.addEventListener('storage', event => {
     if (event.key === LANGUAGE_KEY && ['KO', 'EN'].includes(event.newValue) &&
-        typeof setLanguage === 'function') setLanguage(event.newValue);
+        typeof setLanguage === 'function') setLanguage(event.newValue, 'sync');
 });
 
 function escapeHtml(value) {
@@ -78,3 +92,4 @@ function formatFaqAnswer(value) {
     Array.from(source.content.childNodes).forEach(node => copy(node, output));
     return output.innerHTML;
 }
+

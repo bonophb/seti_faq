@@ -21,6 +21,28 @@
         };
 
         let stateRecovered = false;
+        let banSnapshotKey = '';
+        let drawSequence = 0;
+        let drawTracking = null;
+        let completionTracked = false;
+
+        function randomizerFields() {
+            const pool = ALIEN_SPECIES.filter(item => appState.mode === 'EXP' || !item.exp);
+            return { game_mode: appState.mode || 'none', banned_count: appState.banned.length,
+                candidate_count: pool.filter(item => !appState.banned.includes(item.id)).length };
+        }
+
+        function recordBanSnapshot() {
+            const key = JSON.stringify([appState.mode, [...appState.banned].sort()]);
+            if (key === banSnapshotKey) return;
+            banSnapshotKey = key;
+            const fields = randomizerFields();
+            trackEvent('randomizer_confirm_ban', fields);
+            ALIEN_SPECIES.filter(item => appState.mode === 'EXP' || !item.exp).forEach(item => {
+                trackEvent('randomizer_ban_snapshot', { ...fields, alien_id: item.id,
+                    is_banned: appState.banned.includes(item.id) ? 1 : 0 });
+            });
+        }
         function normalizeRandomizerState(value) {
             const initial = { step: 'mode', mode: null, banned: [], leftWinner: null, rightWinner: null };
             if (!value || typeof value !== 'object' || Array.isArray(value) ||
@@ -117,8 +139,8 @@
             }
         };
 
-        function setLanguage(lang) {
-            lang = applyLanguagePreference(lang);
+        function setLanguage(lang, source = 'user') {
+            lang = applyLanguagePreference(lang, source);
             currentLang = lang;
             document.querySelectorAll('.lang-btn').forEach(btn => btn.classList.remove('active'));
             const activeBtn = document.getElementById(`lang-${lang}`);
@@ -169,6 +191,8 @@
         }
 
         function selectMode(mode) {
+            banSnapshotKey = '';
+            completionTracked = false;
             appState.mode = mode;
             appState.banned = [];
             appState.leftWinner = null;
@@ -176,10 +200,7 @@
             goToStep('ban');
 
             // GA4 이벤트: 게임 모드 선택 추적 (본판만 vs 본판+확장)
-            trackEvent('randomizer_select_mode', {
-                game_mode: mode,
-                game_mode_label: mode === 'EXP' ? '본판+확장' : '본판만'
-            });
+            trackEvent('randomizer_select_mode', randomizerFields());
         }
 
         function goToStep(step) {
@@ -205,9 +226,12 @@
                 appState.banned = appState.banned.filter(bId => bId !== id);
             }
 
+            completionTracked = false;
             appState.leftWinner = null;
             appState.rightWinner = null;
             saveState();
+            trackEvent('randomizer_ban_change', { ...randomizerFields(), alien_id: id,
+                ban_action: isCurrentlyBanned ? 'include' : 'exclude' });
             renderBanGrid();
             document.getElementById('ban-' + id).focus();
         }
@@ -216,16 +240,16 @@
             goToStep('slots');
 
             // GA4 이벤트: 밴 설정 완료 추적
-            trackEvent('randomizer_confirm_ban', {
-                game_mode: appState.mode,
-                banned_count: appState.banned.length,
-                banned_list: appState.banned.join(',')
-            });
+            recordBanSnapshot();
         }
 
         function resetAll() {
+            banSnapshotKey = '';
+            completionTracked = false;
             trackEvent('randomizer_reset', {
-                previous_mode: appState.mode
+                previous_mode: appState.mode || 'none',
+                previous_step: appState.step,
+                completed_slots: Number(Boolean(appState.leftWinner)) + Number(Boolean(appState.rightWinner))
             });
 
             appState = {
@@ -402,6 +426,13 @@
 
         function handleSpinAction() {
             if (!isSpinning) {
+                const candidateMask = wheelCandidates.reduce((mask, item) =>
+                    mask | (1 << ALIEN_SPECIES.findIndex(species => species.id === item.id)), 0);
+                drawTracking = { draw_sequence: ++drawSequence, slot_position: currentSlotTarget,
+                    draw_order: appState.leftWinner || appState.rightWinner ? 2 : 1,
+                    candidate_count: wheelCandidates.length, candidate_mask: candidateMask, recorded: false };
+                const { recorded, ...fields } = drawTracking;
+                trackEvent('randomizer_draw_start', { ...randomizerFields(), ...fields });
                 isSpinning = true;
                 isStopping = false;
                 updateSpinButtonState();
@@ -468,15 +499,21 @@
                 saveState();
 
                 // GA4 맞춤 이벤트: 외계종 당첨 추적
-                trackEvent('randomizer_alien_discovered', {
-                    slot_position: currentSlotTarget,
-                    slot_label: currentSlotTarget === 'LEFT' ? '왼쪽 외계종' : '오른쪽 외계종',
-                    alien_name_ko: winner.ko,
-                    alien_name_en: winner.en,
-                    alien_id: winner.id,
-                    game_mode: appState.mode,
-                    is_expansion: winner.exp ? '확장 외계종' : '본판 외계종'
-                });
+                if (drawTracking && !drawTracking.recorded) {
+                    drawTracking.recorded = true;
+                    const { recorded, ...fields } = drawTracking;
+                    trackEvent('randomizer_alien_discovered', {
+                        ...randomizerFields(), ...fields, alien_id: winner.id,
+                        is_expansion: winner.exp ? 1 : 0
+                    });
+                    if (appState.leftWinner && appState.rightWinner && !completionTracked) {
+                        completionTracked = true;
+                        trackEvent('randomizer_complete', {
+                            ...randomizerFields(), left_alien_id: appState.leftWinner,
+                            right_alien_id: appState.rightWinner
+                        });
+                    }
+                }
 
                 setTimeout(() => {
                     isSpinning = false;
@@ -548,7 +585,8 @@
         }
 
         loadState();
-        setLanguage(currentLang);
+        completionTracked = Boolean(appState.leftWinner && appState.rightWinner);
+        setLanguage(currentLang, 'system');
 
 document.getElementById('wheelModal').addEventListener('keydown', event => {
     if (event.key === 'Escape') { event.preventDefault(); closeWheelModal(); return; }
@@ -566,3 +604,4 @@ document.getElementById('wheelModal').addEventListener('keydown', event => {
 });
 if (stateRecovered) showToast(currentLang === 'KO'
     ? '저장된 추첨 정보의 오류를 복구했습니다.' : 'Saved draw data was repaired.');
+

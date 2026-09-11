@@ -51,6 +51,74 @@
         let isLoaded = false;
         let toastTimer = null;
         let searchDebounceTimer = null;
+        let visibleFaqIds = [];
+        let pendingSearch = null;
+        let lastSearchKey = '';
+        let searchSequence = 0;
+        let activeSearchSequence = 0;
+        let lastDeepLink = '';
+        let loadGeneration = 0;
+        let activeLoadController = null;
+
+        function faqEventFields(item) {
+            return {
+                faq_id: findFaqByStableId(item.faqId) === item ? item.faqId : 'legacy',
+                faq_slug: generateFaqSlug(item, item.id),
+                faq_category: item.cat_ko,
+                faq_edition: item.edition
+            };
+        }
+
+        function searchFields(query) {
+            const normalized = query.normalize('NFKC').toLowerCase().trim().replace(/\s+/g, ' ');
+            const type = getCardNumberPattern(normalized)
+                ? (/et/i.test(normalized) ? 'alien_card' : 'card') : 'text';
+            // Never send arbitrary text. Only short, known public FAQ phrases or card IDs.
+            const suspicious = /[@<>:/\\]|\d[\d\s().+-]{5,}\d/.test(normalized);
+            const known = !suspicious && normalized.length <= 60 && (
+                (type !== 'text' && (normalized.match(/\d+/) || [''])[0].length <= 4) ||
+                faqData.some(item => [item.q_ko, item.q_en, item.a_ko, item.a_en, item.cat_ko, item.cat_en]
+                    .some(value => value.normalize('NFKC').toLowerCase().includes(normalized)))
+            );
+            return {
+                search_term: known ? normalized : '[unclassified]',
+                search_term_policy: known ? 'known_term' : 'redacted',
+                search_type: type
+            };
+        }
+
+        function scheduleSearch() {
+            clearTimeout(searchDebounceTimer);
+            const query = document.getElementById('searchInput').value.trim();
+            if (!query) { pendingSearch = null; lastSearchKey = ''; activeSearchSequence = 0; return; }
+            pendingSearch = {
+                key: JSON.stringify([query.toLowerCase(), currentEdition, currentCategory, currentLang, visibleFaqIds]),
+                fields: { ...searchFields(query), result_count: visibleFaqIds.length,
+                    edition_filter: currentEdition, category_filter: currentCategory, ui_language: currentLang }
+            };
+            searchDebounceTimer = setTimeout(flushSearch, 800);
+        }
+
+        function flushSearch() {
+            clearTimeout(searchDebounceTimer);
+            if (!pendingSearch || !isLoaded) return;
+            const snapshot = pendingSearch;
+            pendingSearch = null;
+            if (snapshot.key === lastSearchKey) return;
+            lastSearchKey = snapshot.key;
+            activeSearchSequence = ++searchSequence;
+            trackEvent('search', { ...snapshot.fields, search_sequence: activeSearchSequence });
+        }
+
+        function recordFaqOpen(item, source) {
+            if (source === 'search') flushSearch();
+            const fields = { ...faqEventFields(item), open_source: source };
+            if (source === 'search') {
+                fields.result_position = visibleFaqIds.indexOf(item.id) + 1;
+                fields.search_sequence = activeSearchSequence;
+            }
+            trackEvent('faq_open', fields);
+        }
 
         const i18n = {
             KO: {
@@ -140,10 +208,11 @@
             }
         });
 
-        function setLanguage(lang) {
+        function setLanguage(lang, source = 'user') {
+            if (source === 'user') flushSearch();
             const selectedCategory = faqData.find(item =>
                 item.cat_ko === currentCategory || item.cat_en === currentCategory);
-            lang = applyLanguagePreference(lang);
+            lang = applyLanguagePreference(lang, source);
             if (currentCategory !== '전체' && selectedCategory) {
                 currentCategory = lang === 'KO' ? selectedCategory.cat_ko : selectedCategory.cat_en;
             }
@@ -167,6 +236,7 @@
             updateTabCounts();
             renderCategories();
             renderFAQs();
+            if (source === 'user') scheduleSearch();
         }
 
         const FAQ_BACKUP_KEY = 'seti_faq_data_v1';
@@ -181,8 +251,7 @@
                 faqData = data;
                 isLoaded = true;
                 clearTimeout(loadTimer);
-                setLanguage(currentLang);
-                checkDeepLink();
+                setLanguage(currentLang, 'system');
                 showToast(currentLang === 'KO'
                     ? '저장된 FAQ를 표시합니다. 최신 내용은 인터넷 연결 후 확인해 주세요.'
                     : 'Showing saved FAQs. Reconnect to check for updates.', '📂');
@@ -190,22 +259,6 @@
             } catch (error) {
                 return false;
             }
-        }
-
-        function startTimeoutTimer() {
-            clearTimeout(loadTimer);
-            loadTimer = setTimeout(() => {
-                if (!isLoaded) {
-                    if (restoreFaqBackup()) return;
-                    const t = i18n[currentLang];
-                    document.getElementById('faqList').innerHTML = 
-                        `<div class="text-center py-12 text-amber-400 font-medium leading-relaxed">
-                            ${t.delayMsg}
-                            <br><button onclick="forceReload()" class="mt-4 px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-500 transition-colors">${t.reloadBtn}</button>
-                         </div>`;
-                    setTimeout(() => loadCSV(GVIZ_URL, true), 1000);
-                }
-            }, 30000);
         }
 
         async function forceReload() {
@@ -221,17 +274,27 @@
             window.location.href = url.href;
         }
 
-        function loadCSV(url, isFallback = false) {
-            if (!isFallback) {
-                isLoaded = false;
-                startTimeoutTimer();
-            }
-
-            Papa.parse(url, {
-                download: true,
-                header: true,
-                skipEmptyLines: true,
-                complete: function(results) {
+        async function loadCSV(url = PUBLISHED_URL) {
+            const generation = ++loadGeneration;
+            if (activeLoadController) activeLoadController.abort();
+            const started = performance.now();
+            isLoaded = false;
+            let errorType = 'network';
+            let attempts = 0;
+            const sources = url === GVIZ_URL ? [GVIZ_URL] : [url, GVIZ_URL];
+            for (const address of sources) {
+                attempts++;
+                const controller = new AbortController();
+                activeLoadController = controller;
+                const timeout = setTimeout(() => controller.abort(), 12000);
+                try {
+                    const response = await fetch(address, { signal: controller.signal });
+                    if (!response.ok) { errorType = 'http'; continue; }
+                    const csv = await response.text();
+                    if (generation !== loadGeneration) return;
+                    if (typeof Papa === 'undefined') { errorType = 'parser_unavailable'; break; }
+                    const results = Papa.parse(csv, { header: true, skipEmptyLines: true });
+                    if (results.errors.length) { errorType = 'csv_parse'; continue; }
                     const parsed = results.data.map((item, idx) => {
                         const cat_ko = item['카테고리 (KO)'] ? item['카테고리 (KO)'].trim() : (item['카테고리'] ? item['카테고리'].trim() : '기타');
                         const cat_en = item['카테고리 (EN)'] ? item['카테고리 (EN)'].trim() : (categoryMap[cat_ko] || cat_ko);
@@ -259,34 +322,42 @@
                         };
                     }).filter(item => item.q_ko !== '' || item.q_en !== '');
 
-                    if (parsed.length > 0) {
-                        isLoaded = true;
-                        clearTimeout(loadTimer);
-                        faqData = parsed;
-                        try {
-                            localStorage.setItem(FAQ_BACKUP_KEY, JSON.stringify(parsed));
-                        } catch (error) {}
-                        
-                        setLanguage(currentLang);
-                        checkDeepLink();
-                    } else if (!isFallback) {
-                        loadCSV(GVIZ_URL, true);
-                    } else {
-                        clearTimeout(loadTimer);
-                        if (restoreFaqBackup()) return;
-                        showError('FAQ 데이터를 읽지 못했습니다. 구글 시트 공유 설정을 확인해주세요.');
-                    }
-                },
-                error: function(err) {
-                    if (!isFallback) {
-                        loadCSV(GVIZ_URL, true);
-                    } else {
-                        clearTimeout(loadTimer);
-                        if (restoreFaqBackup()) return;
-                        showError('데이터 로드에 실패했습니다. 아래 버튼을 눌러 강력 새로고침을 시도해보세요.<br><button onclick="forceReload()" class="mt-4 px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-500">강력 새로고침</button>');
-                    }
-                }
+                    if (!parsed.length) { errorType = 'empty_data'; continue; }
+                    if (generation !== loadGeneration) return;
+                    faqData = parsed;
+                    isLoaded = true;
+                    writePreference(FAQ_BACKUP_KEY, JSON.stringify(parsed));
+                    setLanguage(currentLang, 'system');
+                    const dataMode = response.headers.get('X-SETI-Data-Source') === 'cache' ? 'cache' : 'http';
+                    trackEvent('faq_load', {
+                        load_status: dataMode === 'cache' ? 'saved' : 'success',
+                        data_mode: dataMode, load_source: address === GVIZ_URL ? 'gviz' : 'published',
+                        load_duration_ms: Math.round(performance.now() - started),
+                        faq_count: parsed.length, attempt_count: attempts, error_type: 'none'
+                    });
+                    checkDeepLink();
+                    if (document.getElementById('searchInput').value.trim()) scheduleSearch();
+                    return;
+                } catch (error) {
+                    if (generation !== loadGeneration) return;
+                    errorType = controller.signal.aborted ? 'timeout' : 'network';
+                } finally { clearTimeout(timeout); }
+            }
+            if (generation !== loadGeneration) return;
+            const restored = restoreFaqBackup();
+            trackEvent('faq_load', {
+                load_status: restored ? 'saved' : 'error', data_mode: restored ? 'backup' : 'none',
+                load_source: 'fallback', load_duration_ms: Math.round(performance.now() - started),
+                faq_count: restored ? faqData.length : 0, attempt_count: attempts, error_type: errorType
             });
+            if (restored) {
+                checkDeepLink();
+                if (document.getElementById('searchInput').value.trim()) scheduleSearch();
+            } else {
+                showError(currentLang === 'KO'
+                    ? 'FAQ 데이터를 불러오지 못했습니다. 인터넷 연결을 확인한 후 새로고침해 주세요.'
+                    : 'Unable to load FAQs. Check your connection and refresh.');
+            }
         }
 
         function showError(msg) {
@@ -304,12 +375,17 @@
         }
 
         function setEdition(edition) {
+            if (edition === currentEdition && currentCategory === '전체') return;
+            flushSearch();
             currentEdition = edition;
             currentCategory = '전체';
             document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
             document.getElementById(`tab-${edition}`).classList.add('active');
             renderCategories();
             renderFAQs();
+            trackEvent('faq_filter_change', { filter_name: 'edition', edition_filter: currentEdition,
+                category_filter: currentCategory, result_count: visibleFaqIds.length });
+            scheduleSearch();
         }
 
         function renderCategories() {
@@ -331,6 +407,8 @@
                 btn.textContent = cat === '전체' ? tAll : cat;
                 btn.setAttribute('aria-pressed', String(cat === currentCategory));
                 btn.onclick = () => {
+                    if (cat === currentCategory) return;
+                    flushSearch();
                     currentCategory = cat;
                     document.querySelectorAll('.category-btn').forEach(b => {
                         b.classList.remove('active');
@@ -339,6 +417,9 @@
                     btn.setAttribute('aria-pressed', 'true');
                     btn.classList.add('active');
                     renderFAQs();
+                    trackEvent('faq_filter_change', { filter_name: 'category', edition_filter: currentEdition,
+                        category_filter: currentCategory, result_count: visibleFaqIds.length });
+                    scheduleSearch();
                 };
                 container.appendChild(btn);
             });
@@ -353,10 +434,7 @@
                 if (!box.classList.contains('hidden')) {
                     const item = faqData.find(d => d.id === id);
                     if (item) {
-                        trackEvent('view_en_original', {
-                            faq_title: item.q_ko,
-                            faq_category: item.cat_ko
-                        });
+                        trackEvent('view_en_original', faqEventFields(item));
                     }
                 }
             }
@@ -612,44 +690,47 @@
             return `faq-${item.id !== undefined ? item.id + 1 : index + 1}`;
         }
 
-        function copyFaqLink(slug, event, id) {
+        async function copyFaqLink(slug, event, id) {
             if (event) event.stopPropagation();
-            const url = `${window.location.origin}${window.location.pathname}#${slug}`;
-            
+            const item = faqData.find(data => data.id === id);
+            const fields = item ? faqEventFields(item) : { faq_id: 'legacy', faq_slug: slug };
+            const url = window.location.origin + window.location.pathname + '#' + slug;
+            let copied = false;
             if (navigator.clipboard && navigator.clipboard.writeText) {
-                navigator.clipboard.writeText(url).then(() => {
-                    showToast(currentLang === 'KO' ? "🔗 해당 FAQ 공유 링크가 복사되었습니다!" : "🔗 FAQ link copied to clipboard!", "🔗");
-                }).catch(() => fallbackCopyText(url));
-            } else {
-                fallbackCopyText(url);
+                try { await navigator.clipboard.writeText(url); copied = true; } catch (error) {}
             }
-
-            const item = faqData.find(d => d.id === id);
-            trackEvent('faq_share', {
-                faq_slug: slug,
-                faq_title: item ? item.q_ko : slug,
-                faq_edition: item ? item.edition : ''
-            });
+            if (!copied) copied = fallbackCopyText(url);
+            if (copied) {
+                trackEvent('faq_share', { ...fields, share_method: 'clipboard' });
+                showToast(currentLang === 'KO' ? '🔗 FAQ 링크를 복사했습니다!' : '🔗 FAQ link copied!', '🔗');
+            } else {
+                showToast(currentLang === 'KO' ? '링크를 복사하지 못했습니다.' : 'Could not copy the link.');
+            }
         }
 
         function fallbackCopyText(text) {
+            const previous = document.activeElement;
             const input = document.createElement('input');
             input.value = text;
             document.body.appendChild(input);
-            input.select();
-            document.execCommand('copy');
-            document.body.removeChild(input);
-            showToast(currentLang === 'KO' ? "🔗 해당 FAQ 공유 링크가 복사되었습니다!" : "🔗 FAQ link copied to clipboard!", "🔗");
+            try { input.select(); return document.execCommand('copy') === true; }
+            catch (error) { return false; }
+            finally { input.remove(); if (previous && previous.isConnected) previous.focus(); }
         }
 
         function checkDeepLink() {
             const rawHash = window.location.hash.replace('#', '').trim().toLowerCase();
-            if (!rawHash || faqData.length === 0) return;
+            if (!rawHash) { lastDeepLink = ''; return; }
+            if (faqData.length === 0) return;
 
             const targetItem = resolveFaqLink(rawHash);
 
             if (targetItem) {
+                flushSearch();
                 document.getElementById('searchInput').value = '';
+                pendingSearch = null;
+                lastSearchKey = '';
+                activeSearchSequence = 0;
                 currentEdition = targetItem.edition;
                 currentCategory = '전체';
                 document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
@@ -659,6 +740,11 @@
                 renderCategories();
                 renderFAQs();
 
+                const linkKey = generateFaqSlug(targetItem, targetItem.id) + ':' + rawHash;
+                if (lastDeepLink !== linkKey) {
+                    recordFaqOpen(targetItem, 'shared_link');
+                    lastDeepLink = linkKey;
+                }
                 const targetId = targetItem.id;
                 const answer = document.getElementById(`answer-${targetId}`);
                 const icon = document.getElementById(`icon-${targetId}`);
@@ -726,6 +812,7 @@
                     qEn.includes(rawQuery) || aEn.includes(rawQuery);
             });
 
+            visibleFaqIds = filtered.map(item => item.id);
             if (filtered.length === 0) {
                 listContainer.innerHTML = `<div class="text-center py-12 text-gray-500">${t.noResult}</div>`;
                 return;
@@ -804,15 +891,11 @@
                 if (answer.classList.contains('hidden')) {
                     answer.classList.remove('hidden');
                     if (icon) icon.textContent = '−';
+                    document.getElementById(`faq-toggle-${id}`).setAttribute('aria-expanded', 'true');
 
                     const item = faqData.find(d => d.id === id);
                     if (item) {
-                        trackEvent('faq_open', {
-                            faq_title: item.q_ko,
-                            faq_category: item.cat_ko,
-                            faq_edition: item.edition,
-                            language: currentLang
-                        });
+                        recordFaqOpen(item, document.getElementById('searchInput').value.trim() ? 'search' : 'browse');
                     }
                 } else {
                     answer.classList.add('hidden');
@@ -824,19 +907,13 @@
 
         document.getElementById('searchInput').addEventListener('input', () => {
             renderFAQs();
-
-            const query = document.getElementById('searchInput').value.trim();
-            clearTimeout(searchDebounceTimer);
-            if (query.length >= 2) {
-                searchDebounceTimer = setTimeout(() => {
-                    trackEvent('search', {
-                        search_term: query
-                    });
-                }, 800);
-            }
+            scheduleSearch();
+        });
+        document.getElementById('searchInput').addEventListener('keydown', event => {
+            if (event.key === 'Enter') { scheduleSearch(); flushSearch(); }
         });
 
-        setLanguage(currentLang);
+        setLanguage(currentLang, 'system');
         loadCSV(PUBLISHED_URL);
 
 document.getElementById('rulebookDropdownContainer').addEventListener('keydown', event => {
@@ -848,3 +925,4 @@ document.getElementById('rulebookDropdownContainer').addEventListener('keydown',
         event.preventDefault();
     }
 });
+
