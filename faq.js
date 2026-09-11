@@ -70,15 +70,16 @@
         }
 
         function searchFields(query) {
-            const normalized = query.normalize('NFKC').toLowerCase().trim().replace(/\s+/g, ' ');
+            const normalized = normalizeSearchText(query);
             const type = getCardNumberPattern(normalized)
                 ? (/et/i.test(normalized) ? 'alien_card' : 'card') : 'text';
             // Never send arbitrary text. Only short, known public FAQ phrases or card IDs.
             const suspicious = /[@<>:/\\]|\d[\d\s().+-]{5,}\d/.test(normalized);
             const known = !suspicious && normalized.length <= 60 && (
                 (type !== 'text' && (normalized.match(/\d+/) || [''])[0].length <= 4) ||
-                faqData.some(item => [item.q_ko, item.q_en, item.a_ko, item.a_en, item.cat_ko, item.cat_en]
-                    .some(value => value.normalize('NFKC').toLowerCase().includes(normalized)))
+                faqData.some(item => [...getFaqSearchText(item).questions, ...getFaqSearchText(item).answers,
+                    normalizeSearchText(item.cat_ko), normalizeSearchText(item.cat_en)]
+                    .some(value => value.includes(normalized)))
             );
             return {
                 search_term: known ? normalized : '[unclassified]',
@@ -770,9 +771,32 @@
 
         window.addEventListener('hashchange', checkDeepLink);
 
+        function normalizeSearchText(value) {
+            return String(value ?? '').normalize('NFKC').toLowerCase().trim().replace(/\s+/g, ' ');
+        }
+
+        // Cache by row object: a data reload creates new rows and a fresh index.
+        const faqSearchCache = new WeakMap();
+        function getFaqSearchText(item) {
+            if (faqSearchCache.has(item)) return faqSearchCache.get(item);
+            function answerText(value) {
+                const template = document.createElement('template');
+                // Use the same allowed markup as the displayed answer. Block boundaries
+                // separate words; inline formatting does not break words apart.
+                template.innerHTML = formatFaqAnswer(value).replace(/<br\s*\/?\s*>|<\/(?:p|li|ul|ol|pre|blockquote)>/gi, ' ');
+                return normalizeSearchText(Array.from(template.content.childNodes, node => node.textContent).join(''));
+            }
+            const fields = {
+                questions: [item.q_ko, item.q_en].map(normalizeSearchText),
+                answers: [item.a_ko, item.a_en].map(answerText)
+            };
+            faqSearchCache.set(item, fields);
+            return fields;
+        }
+
         // 카드 번호만 입력한 경우 일반 부분 검색 대신 번호 전체를 비교합니다.
         function getCardNumberPattern(query) {
-            const match = query.match(/^#?\s*(?:(et)\s*\.?\s*)?(\d+)$/i);
+            const match = normalizeSearchText(query).match(/^#?\s*(?:(et)\s*\.?\s*)?(\d+)$/i);
             if (!match) return null;
 
             const number = match[2].replace(/^0+(?=\d)/, '');
@@ -783,7 +807,9 @@
         function renderFAQs() {
             document.querySelectorAll('.tab-btn').forEach(button =>
                 button.setAttribute('aria-pressed', String(button.id === 'tab-' + currentEdition)));
-            const rawQuery = document.getElementById('searchInput').value.toLowerCase().trim();
+            const rawQuery = normalizeSearchText(document.getElementById('searchInput').value);
+            const terms = rawQuery.split(' ').filter(Boolean);
+            const scores = new Map();
             const cardNumberPattern = getCardNumberPattern(rawQuery);
             const listContainer = document.getElementById('faqList');
             const t = i18n[currentLang];
@@ -799,18 +825,25 @@
                 if (!matchesEdition || !matchesCategory) return false;
                 if (!rawQuery) return true;
 
-                const qKo = item.q_ko.toLowerCase();
-                const aKo = item.a_ko.toLowerCase();
-                const qEn = item.q_en.toLowerCase();
-                const aEn = item.a_en.toLowerCase();
-
+                const { questions, answers } = getFaqSearchText(item);
                 if (cardNumberPattern) {
-                    return cardNumberPattern.test(qKo) || cardNumberPattern.test(qEn);
+                    return questions.some(text => cardNumberPattern.test(text));
                 }
-
-                return qKo.includes(rawQuery) || aKo.includes(rawQuery) ||
-                    qEn.includes(rawQuery) || aEn.includes(rawQuery);
+                const fields = [...questions, ...answers];
+                if (!terms.every(term => fields.some(text => text.includes(term)))) return false;
+                // Exact title > title phrase > all terms in titles > partial title > answer.
+                const titleText = questions.join(' ');
+                const titleHits = terms.filter(term => titleText.includes(term)).length;
+                const score = questions.some(text => text === rawQuery) ? 4 :
+                    questions.some(text => text.includes(rawQuery)) ? 3 :
+                    titleHits === terms.length ? 2 : titleHits ? 1 : 0;
+                scores.set(item, score);
+                return true;
             });
+            if (rawQuery && !cardNumberPattern) {
+                // Stable sorting preserves sheet order for equally relevant answers.
+                filtered.sort((a, b) => scores.get(b) - scores.get(a));
+            }
 
             visibleFaqIds = filtered.map(item => item.id);
             if (filtered.length === 0) {
