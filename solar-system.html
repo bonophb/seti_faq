@@ -3,6 +3,19 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex,nofollow"><title>SETI · 태양계 시뮬레이터</title>
+<!-- GA4: record a page view when the simulator opens. -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-D8WD3NKS7N"></script>
+<script>
+window.dataLayer = window.dataLayer || [];
+function gtag() { dataLayer.push(arguments); }
+gtag('js', new Date());
+document.addEventListener('DOMContentLoaded', function () {
+    gtag('config', 'G-D8WD3NKS7N', {
+        send_page_view: true,
+        page_title: document.title
+    });
+}, { once: true });
+</script>
 <style>
 *{box-sizing:border-box}body{margin:0;background:#080e19;color:#e9edf5;font-family:system-ui,-apple-system,sans-serif}main{max-width:820px;margin:auto;padding:24px 16px 36px}header{display:flex;align-items:baseline;justify-content:space-between;gap:12px}h1{font-size:24px;margin:0}header span{font-size:12px;color:#a4b4cb;letter-spacing:.12em}.intro{color:#a4b4cb;font-size:14px;margin:12px 0 4px}.board{position:relative;width:min(100%,660px);aspect-ratio:1;margin:0 auto 12px;isolation:isolate}.board img{position:absolute;left:50%;top:50%;height:auto;transform:translate(-50%,-50%) rotate(0deg);transform-origin:50% 50%;transition:transform .35s ease-in-out;user-select:none;pointer-events:none}.controls{display:grid;gap:10px;max-width:600px;margin:auto}.row{display:grid;grid-template-columns:minmax(90px,1fr) 1fr 1fr;gap:10px;align-items:center;padding:12px;background:#111c2d;border:1px solid #24334a;border-radius:14px}.label{font-weight:700}.label small{display:block;color:#92a5be;font-size:11px;font-weight:400;margin-top:4px}button{font:inherit;font-size:14px;font-weight:600;min-height:46px;border:1px solid #3d577a;border-radius:10px;background:#1c304c;color:#e9edf5;cursor:pointer;touch-action:manipulation}button:hover{background:#2b4669}button:active{background:#355581}button:focus-visible{outline:3px solid #7dd3fc;outline-offset:3px}#status{text-align:center;color:#a4b4cb;min-height:20px;font-size:13px;margin:16px 0 0}.credits{font-size:11px;text-align:center;color:#71849f;margin-top:20px}@media(prefers-reduced-motion:reduce){.board img{transition:none}}@media(max-width:380px){main{padding:18px 10px}.row{gap:6px;padding:10px}button{font-size:12px}}
 .intro{line-height:1.75}.intro p{margin:10px 0}.intro strong{color:#d6e6fb}#sun{animation:sun-drift 120s linear infinite}@keyframes sun-drift{from{transform:translate(-50%,-50%) rotate(0deg)}to{transform:translate(-50%,-50%) rotate(-360deg)}}@media(prefers-reduced-motion:reduce){#sun{animation:none}}@media(max-width:460px){.row{grid-template-columns:1fr 1fr}.label{grid-column:1/-1}.label small{display:inline;margin-left:10px}}
