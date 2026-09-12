@@ -78,7 +78,7 @@
             KO: {
                 title: "👾 외계종 발견 랜더마이저",
                 sub: "본판 및 확장 외계종 추첨 돌림판 시스템",
-                faq: "SETI FAQ",
+                faq: "← FAQ로 돌아가기",
                 reset: "초기화",
                 step1Title: "1단계: 게임 모드를 선택하세요",
                 step1Desc: "플레이할 게임 버전에 따라 외계종 풀이 결정됩니다.",
@@ -109,7 +109,7 @@
             EN: {
                 title: "👾 Alien Discovery Randomizer",
                 sub: "Base & Expansion Alien Discovery Wheel",
-                faq: "SETI FAQ",
+                faq: "← Back to FAQ",
                 reset: "Reset",
                 step1Title: "Step 1: Select Game Mode",
                 step1Desc: "Choose the alien species pool based on your game setup.",

@@ -1,5 +1,5 @@
 const CACHE_PREFIX = 'seti-faq-';
-const CACHE_NAME = CACHE_PREFIX + 'v9';
+const CACHE_NAME = CACHE_PREFIX + 'v10';
 const LOCAL_ASSETS = [
   './', './index.html', './randomizer.html', './manifest.json',
   './icon-192.png', './icon-512.png',
