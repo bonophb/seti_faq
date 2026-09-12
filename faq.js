@@ -226,6 +226,8 @@
             document.getElementById('header-title').textContent = t.title;
             document.getElementById('header-sub').textContent = t.sub;
             document.getElementById('searchInput').placeholder = t.placeholder;
+            const solarLink = document.getElementById('link-solar-simulator');
+            if (solarLink) solarLink.textContent = currentLang === 'EN' ? 'Solar System Simulator' : '태양계 시뮬레이터';
             document.getElementById('search-tip').textContent = t.tip;
             document.getElementById('reload-btn-text').textContent = t.reloadText;
             document.getElementById('link-alien-randomizer').textContent = t.alienRandomizer;
